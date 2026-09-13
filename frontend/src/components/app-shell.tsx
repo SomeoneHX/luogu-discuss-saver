@@ -42,9 +42,7 @@ function DesktopSidebar({ pathname }: { pathname: string }) {
             href="/"
             className="flex items-center rounded-xl px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted/40"
           >
-            <span className="grid size-5 shrink-0 place-items-center rounded-md bg-indigo-500/85 text-[0.6rem] font-bold text-white">
-              谷
-            </span>
+            <img src="/logo.svg" alt="洛谷帖子保存站" className="size-5 shrink-0" />
             <span className="ml-3 whitespace-nowrap text-base/1 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
               洛谷帖子保存站
             </span>
