@@ -59,10 +59,27 @@ export function App() {
 
   const navigate = React.useCallback(
     (to: string) => {
-      if (to === pathname) return;
+      const url = new URL(to, window.location.origin);
+      const path = url.pathname;
+      if (path === pathname && !url.hash) return;
       window.history.pushState(null, "", to);
-      setPathname(to);
-      window.scrollTo(0, 0);
+      setPathname(path);
+      const hash = url.hash.slice(1);
+      if (hash) {
+        // 目标锚点所在页面内容是异步加载的，轮询等元素出现后再滚动
+        let tries = 0;
+        const scrollToAnchor = (): void => {
+          const el = document.getElementById(hash);
+          if (el) {
+            el.scrollIntoView();
+          } else if (tries++ < 20) {
+            setTimeout(scrollToAnchor, 150);
+          }
+        };
+        setTimeout(scrollToAnchor, 50);
+      } else {
+        window.scrollTo(0, 0);
+      }
     },
     [pathname, setPathname],
   );
@@ -70,7 +87,7 @@ export function App() {
   const router = React.useMemo<Router>(() => ({ pathname, navigate }), [pathname, navigate]);
 
   let page: React.ReactNode;
-  const seg = pathname.split("?")[0]?.split("/").filter(Boolean) ?? [];
+  const seg = pathname.split(/[?#]/)[0]?.split("/").filter(Boolean) ?? [];
   const discussionMatch = seg[0] === "d" && seg[1]?.match(/^(\d+)(?:@([a-z0-9]+))?$/i);
   if (discussionMatch) {
     page = (
