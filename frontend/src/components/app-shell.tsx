@@ -192,12 +192,57 @@ function ThemeToggle() {
   );
 }
 
+const SITE_LAUNCHED_AT = new Date("2026-09-13T00:00:00+08:00");
+const REPO_URL = "https://github.com/SomeoneHX/luogu-discuss-saver";
+
+/** 网站运行时长文案，每分钟刷新 */
+function useUptimeText(): string {
+  const [now, setNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  let seconds = Math.max(0, Math.floor((now - SITE_LAUNCHED_AT.getTime()) / 1000));
+  const days = Math.floor(seconds / 86400);
+  seconds -= days * 86400;
+  const hours = Math.floor(seconds / 3600);
+  seconds -= hours * 3600;
+  const minutes = Math.floor(seconds / 60);
+
+  if (days > 0) return `已运行 ${days} 天 ${hours} 小时`;
+  if (hours > 0) return `已运行 ${hours} 小时 ${minutes} 分钟`;
+  return `已运行 ${minutes} 分钟`;
+}
+
 function AppFooter() {
+  const uptime = useUptimeText();
   return (
     <footer className="border-t py-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-4 text-center text-xs text-muted-foreground">
         <span className="font-semibold text-foreground">洛谷帖子保存站</span>
         <span>数据来自公开讨论页存档，仅供检索与回看。</span>
+        <span>{uptime}</span>
+        <span>
+          开源：
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="transition-colors hover:text-foreground"
+          >
+            SomeoneHX/luogu-discuss-saver
+          </a>
+          {" · "}
+          <a
+            href={`${REPO_URL}/blob/main/LICENSE.md`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="transition-colors hover:text-foreground"
+          >
+            AGPL-3.0
+          </a>
+        </span>
       </div>
     </footer>
   );
