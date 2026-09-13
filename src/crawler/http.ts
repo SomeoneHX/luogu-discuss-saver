@@ -35,10 +35,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 单账号请求间隔闸门。注意：模块级状态不跨 isolate，
- *  个人站单 isolate 足够；若要严格全局限流可升级到 Durable Object。 */
+/** 单账号请求间隔闸门：最小间隔之上叠加 0~50% 随机抖动，
+ *  避免呈现固定节律（洛谷自动风控会识别「高度一致的请求间隔」）。
+ *  注意：模块级状态不跨 isolate，个人站单 isolate 足够；
+ *  若要严格全局限流可升级到 Durable Object。 */
 async function throttle(minIntervalMs: number): Promise<void> {
-  const wait = lastRequestAt + minIntervalMs - Date.now();
+  const interval = minIntervalMs + Math.floor(Math.random() * minIntervalMs * 0.5);
+  const wait = lastRequestAt + interval - Date.now();
   if (wait > 0) await sleep(wait);
   lastRequestAt = Date.now();
 }
