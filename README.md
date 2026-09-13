@@ -2,8 +2,6 @@
 
 洛谷讨论帖存档站 —— **仅讨论帖子系统**。对洛谷社区的讨论帖（帖子 + 回复 + 多版本快照）做按需抓取、持久化与浏览，部署于 Cloudflare Pages / Workers / D1，前端界面移植自 [luogu-archive](https://github.com/oi-zone/luogu-archive)。
 
-在线实例：<https://lglg.pages.dev>
-
 ## 功能
 
 - **讨论帖浏览**：帖子正文、回复列表（分页加载）、多版本快照与「时光机」版本切换、快照链接分享
@@ -110,7 +108,7 @@ wrangler.toml             Pages 配置（pages_build_output_dir = "dist"）
 | GET  | `/api/trending/recent`          | 最近归档（边缘缓存 60s）                            |
 | GET  | `/api/users/:id`                | 用户页聚合数据                                   |
 | GET  | `/api/users/:id/timeline`       | 用户时间线（游标分页）                               |
-| POST | `/api/discussions/:id/crawl`    | 触发抓取（入队，失败时降级直连）                          |
+| POST | `/api/discussions/:id/crawl`    | 触发抓取（入队，失败时降级直连；按帖冷却 `CRAWL_COOLDOWN_SECONDS`，默认 300s） |
 | GET  | `/api/health/luogu`             | 取数通路 + cookie 健康检查                        |
 
 ## 部署
