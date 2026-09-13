@@ -140,8 +140,12 @@ function OperationPanel({
 
       <dl className="mt-6 space-y-3 text-sm text-foreground">
         <StatRow
-          label="当前回复"
+          label="洛谷回复数"
           value={`${post.replyCount.toLocaleString("zh-CN")}\u2009条`}
+        />
+        <StatRow
+          label="已归档回复"
+          value={`${post._count.replies.toLocaleString("zh-CN")}\u2009条`}
         />
         <StatRow
           label="当前快照"
@@ -462,7 +466,7 @@ export function DiscussionPage({
         time: new Date(post.time),
         forum: snap?.forum ?? null,
         author: snap?.author ?? null,
-        allRepliesCount: post.replyCount,
+        allRepliesCount: post._count.replies,
         allParticipantsCount: post._replyParticipantCount ?? 0,
       }}
     />
@@ -582,7 +586,7 @@ export function DiscussionPage({
                           time: new Date(post.time),
                           forum: snap?.forum ?? null,
                           author: snap?.author ?? null,
-                          allRepliesCount: post.replyCount,
+                          allRepliesCount: post._count.replies,
                           allParticipantsCount: post._replyParticipantCount ?? 0,
                         }}
                       />

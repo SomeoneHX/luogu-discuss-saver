@@ -18,6 +18,8 @@ export interface Env {
   LUOGU_COOKIE?: string;
   /** 单账号请求间隔下限（毫秒），默认 6000。 */
   CRAWL_MIN_INTERVAL_MS?: string;
+  /** 按帖冷却秒数：距上次快照确认不足该值时拒绝重复触发（0=关闭）。 */
+  CRAWL_COOLDOWN_SECONDS?: string;
   /** 旧帖增量抓取阈值，默认 5。 */
   REPLY_DELTA_THRESHOLD?: string;
 }

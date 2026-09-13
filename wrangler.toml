@@ -27,5 +27,7 @@ queue = "luogu-crawl"
 [vars]
 # 单账号请求间隔下限（毫秒），.com.cn 域请保持 >= 5000
 CRAWL_MIN_INTERVAL_MS = "6000"
+# 按帖冷却秒数：距最近一次快照确认不足该值时拒绝重复触发更新
+CRAWL_COOLDOWN_SECONDS = "300"
 # 旧帖增量抓取阈值：新回复数 - 已归档回复数 > 该值才抓
 REPLY_DELTA_THRESHOLD = "5"

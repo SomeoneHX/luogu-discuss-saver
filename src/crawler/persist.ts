@@ -10,7 +10,7 @@
  * 串行（例如恢复全量自动抓取），可再引入 Durable Object。
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, max, or } from "drizzle-orm";
 
 import type { Db } from "../db/client.js";
 import { schema } from "../db/client.js";
@@ -113,54 +113,100 @@ export async function savePostSnapshot(
   return { isNew: true };
 }
 
-/** 保存一组回复快照，返回新增（内容有变化）的数量。 */
+/** 保存一组回复快照，返回新增（内容有变化）的数量。
+ *  批量实现：2 次读 + 至多 2 次写（逐条循环版为每条 2 次查询，
+ *  在 Workers 免费档会逼近单调用 50 subrequest 上限）。 */
 export async function saveReplySnapshots(
   db: Db,
   payloads: ReplySnapshotInput[],
 ): Promise<number> {
-  let numNew = 0;
+  if (!payloads.length) return 0;
 
-  for (const reply of payloads) {
-    const now = new Date(reply.time * 1000);
-    const hash = await sha256Hex(reply.content);
+  // 1) 每条回复的最新快照时间（单次 group by）
+  const latestRows = await db
+    .select({
+      replyId: schema.ReplySnapshot.replyId,
+      latest: max(schema.ReplySnapshot.capturedAt),
+    })
+    .from(schema.ReplySnapshot)
+    .where(
+      inArray(
+        schema.ReplySnapshot.replyId,
+        payloads.map((p) => p.id),
+      ),
+    )
+    .groupBy(schema.ReplySnapshot.replyId);
+  const latestPairs = latestRows.flatMap((r) =>
+    r.latest ? [{ replyId: r.replyId, capturedAt: r.latest }] : [],
+  );
 
-    const [latest] = await db
+  // 2) 这些最新快照的 contentHash（按对切分，避免参数超限）
+  const latestMap = new Map<number, string>();
+  for (let i = 0; i < latestPairs.length; i += 40) {
+    const chunk = latestPairs.slice(i, i + 40);
+    const rows = await db
       .select({
+        replyId: schema.ReplySnapshot.replyId,
         capturedAt: schema.ReplySnapshot.capturedAt,
         contentHash: schema.ReplySnapshot.contentHash,
       })
       .from(schema.ReplySnapshot)
-      .where(eq(schema.ReplySnapshot.replyId, reply.id))
-      .orderBy(desc(schema.ReplySnapshot.capturedAt))
-      .limit(1);
-
-    if (latest && latest.contentHash === hash) {
-      await db
-        .update(schema.ReplySnapshot)
-        .set({ lastSeenAt: now })
-        .where(
-          and(
-            eq(schema.ReplySnapshot.replyId, reply.id),
-            eq(schema.ReplySnapshot.capturedAt, latest.capturedAt),
+      .where(
+        or(
+          ...chunk.map((p) =>
+            and(
+              eq(schema.ReplySnapshot.replyId, p.replyId),
+              eq(schema.ReplySnapshot.capturedAt, p.capturedAt),
+            ),
           ),
-        );
-      continue;
-    }
-
-    await db
-      .insert(schema.ReplySnapshot)
-      .values({
-        replyId: reply.id,
-        content: reply.content,
-        capturedAt: now,
-        lastSeenAt: now,
-        contentHash: hash,
-      })
-      .onConflictDoNothing();
-    numNew++;
+        ),
+      );
+    for (const row of rows) latestMap.set(row.replyId, row.contentHash);
   }
 
-  return numNew;
+  const now = new Date(Math.max(...payloads.map((p) => p.time)) * 1000);
+  const unchangedPairs: { replyId: number; capturedAt: Date }[] = [];
+  const toInsert: (typeof schema.ReplySnapshot.$inferInsert)[] = [];
+
+  for (const reply of payloads) {
+    const hash = await sha256Hex(reply.content);
+    const capturedAt = new Date(reply.time * 1000);
+    if (latestMap.get(reply.id) === hash) {
+      unchangedPairs.push({ replyId: reply.id, capturedAt: latestPairs.find((p) => p.replyId === reply.id)!.capturedAt });
+      continue;
+    }
+    toInsert.push({
+      replyId: reply.id,
+      content: reply.content,
+      capturedAt,
+      lastSeenAt: now,
+      contentHash: hash,
+    });
+  }
+
+  // 3) 未变化的批量刷新 lastSeenAt（按对切分）
+  for (let i = 0; i < unchangedPairs.length; i += 40) {
+    await db
+      .update(schema.ReplySnapshot)
+      .set({ lastSeenAt: now })
+      .where(
+        or(
+          ...unchangedPairs.slice(i, i + 40).map((p) =>
+            and(
+              eq(schema.ReplySnapshot.replyId, p.replyId),
+              eq(schema.ReplySnapshot.capturedAt, p.capturedAt),
+            ),
+          ),
+        ),
+      );
+  }
+
+  // 4) 新快照单次多行插入（同秒主键冲突兜底）
+  if (toInsert.length) {
+    await db.insert(schema.ReplySnapshot).values(toInsert).onConflictDoNothing();
+  }
+
+  return toInsert.length;
 }
 
 /** 某回复最新快照的 capturedAt（Unix 秒），无则 null。 */

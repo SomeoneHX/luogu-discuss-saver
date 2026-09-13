@@ -5,10 +5,13 @@
  * 抓取动作本身不在 Pages 内执行——见 worker/ 目录。
  */
 
+import { eq, max } from "drizzle-orm";
+
 import type { Hono } from "hono";
 
 import { listDiscuss } from "../crawler/discuss.js";
 import { getDb } from "../db/client.js";
+import { schema } from "../db/client.js";
 import type { Env } from "../env.js";
 import { enqueue, type Job } from "../queue/jobs.js";
 import { getFeedPage } from "../query/feed.js";
@@ -219,6 +222,27 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id)) return c.json({ error: "invalid id" }, 400);
     const page = toEpochSeconds(c.req.query("page"));
+
+    // 按帖冷却：距最近一次快照确认不足 CRAWL_COOLDOWN_SECONDS 时拒绝，
+    // 防止同一帖被反复触发整条回填链（消耗队列 ops 与 D1 写行数）。
+    const cooldown = Number(c.env.CRAWL_COOLDOWN_SECONDS ?? "300");
+    if (cooldown > 0 && page === undefined) {
+      const db = getDb(c.env);
+      const [row] = await db
+        .select({ lastSeen: max(schema.PostSnapshot.lastSeenAt) })
+        .from(schema.PostSnapshot)
+        .where(eq(schema.PostSnapshot.postId, id));
+      if (row?.lastSeen) {
+        const elapsed = Date.now() - row.lastSeen.getTime();
+        if (elapsed < cooldown * 1000) {
+          const retryAfter = Math.ceil((cooldown * 1000 - elapsed) / 1000);
+          return c.json(
+            { error: `该帖 ${Math.ceil(retryAfter / 60)} 分钟内已更新过，请稍后再试`, retryAfter },
+            429,
+          );
+        }
+      }
+    }
 
     const job: Job = {
       type: "discuss",

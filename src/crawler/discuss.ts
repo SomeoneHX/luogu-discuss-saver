@@ -105,25 +105,19 @@ async function saveReplyRows(
   const deduplicated = deduplicate(items, (i) => i.reply.id);
   if (!deduplicated.length) return;
 
-  for (const { postId, reply } of deduplicated) {
-    const values = {
-      id: reply.id,
-      postId,
-      authorId: reply.author.uid,
-      time: new Date(reply.time * 1000),
-    };
-    await db
-      .insert(schema.Reply)
-      .values(values)
-      .onConflictDoUpdate({
-        target: schema.Reply.id,
-        set: {
-          postId: values.postId,
-          authorId: values.authorId,
-          time: values.time,
-        },
-      });
-  }
+  // Reply 行字段不可变（postId/authorId/time 固定），冲突即跳过；
+  // 单次多行插入替代逐条 upsert，省 D1 写行数与 subrequest。
+  await db
+    .insert(schema.Reply)
+    .values(
+      deduplicated.map(({ postId, reply }) => ({
+        id: reply.id,
+        postId,
+        authorId: reply.author.uid,
+        time: new Date(reply.time * 1000),
+      })),
+    )
+    .onConflictDoNothing();
 }
 
 // ------------------------------- fetchDiscuss ------------------------------
