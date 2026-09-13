@@ -1,0 +1,41 @@
+# 后台 Worker 配置：Cron 调度 + 队列消费 + Durable Object（PostLocker）
+#
+# 该 Worker 无用户 HTTP 入口，国内无需可达；用户只访问 Pages。
+# 首次部署前：
+#   wrangler queues create luogu-crawl
+#   wrangler queues create luogu-crawl-dlq
+#
+name = "lgds-jobs"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 与 Pages 共用同一个 D1
+[[d1_databases]]
+binding = "DB"
+database_name = "luogu-discuss"
+database_id = "055c84a5-5656-44a1-9028-4523ad78899b"
+
+[[queues.producers]]
+binding = "CRAWL_QUEUE"
+queue = "luogu-crawl"
+
+[[queues.consumers]]
+queue = "luogu-crawl"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "luogu-crawl-dlq"
+
+# 每个 postId 一个 DO 实例，串行化快照写入（替代 pg_advisory_xact_lock）
+[[durable_objects.bindings]]
+name = "POST_LOCKER"
+class_name = "PostLocker"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PostLocker"]
+
+[vars]
+CRAWL_MIN_INTERVAL_MS = "6000"
+REPLY_DELTA_THRESHOLD = "5"

@@ -1,0 +1,31 @@
+# Cloudflare Pages 配置（前端静态 + Pages Functions 后端）
+#
+# 说明：
+#   - Pages Functions 不支持 Cron Triggers 与 Queues，因此自动抓取改为
+#     「按需抓取 + 可选外部 scheduler 调用 /api/cron/crawl」。
+#   - 静态产物目录：dist（由 `npm run build` 生成的 Vite 产物）。
+#
+name = "luogu-discuss-saver"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 数据库。创建后把 database_id 替换为你自己的：
+#   wrangler d1 create luogu-discuss
+[[d1_databases]]
+binding = "DB"
+database_name = "luogu-discuss"
+database_id = "055c84a5-5656-44a1-9028-4523ad78899b"
+migrations_dir = "migrations"
+
+# Pages 作为队列**生产者**：用户点「抓取」或外部触发时，把任务发给后台 Worker。
+# 消费者在 worker/wrangler.toml 中定义。
+[[queues.producers]]
+binding = "CRAWL_QUEUE"
+queue = "luogu-crawl"
+
+[vars]
+# 单账号请求间隔下限（毫秒），.com.cn 域请保持 >= 5000
+CRAWL_MIN_INTERVAL_MS = "6000"
+# 旧帖增量抓取阈值：新回复数 - 已归档回复数 > 该值才抓
+REPLY_DELTA_THRESHOLD = "5"
