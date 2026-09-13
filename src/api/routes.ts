@@ -221,12 +221,11 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
   app.post("/api/discussions/:id/crawl", async (c) => {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id)) return c.json({ error: "invalid id" }, 400);
-    const page = toEpochSeconds(c.req.query("page"));
 
     // 按帖冷却：距最近一次快照确认不足 CRAWL_COOLDOWN_SECONDS 时拒绝，
     // 防止同一帖被反复触发整条回填链（消耗队列 ops 与 D1 写行数）。
     const cooldown = Number(c.env.CRAWL_COOLDOWN_SECONDS ?? "300");
-    if (cooldown > 0 && page === undefined) {
+    if (cooldown > 0) {
       const db = getDb(c.env);
       const [row] = await db
         .select({ lastSeen: max(schema.PostSnapshot.lastSeenAt) })
@@ -244,11 +243,7 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
       }
     }
 
-    const job: Job = {
-      type: "discuss",
-      id,
-      ...(page !== undefined ? { page } : {}),
-    };
+    const job: Job = { type: "discuss", id };
     let queued = false;
     try {
       queued = await enqueue(c.env, job);
@@ -263,8 +258,8 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
           console.error(`[crawl] direct crawl failed: ${String(err)}`);
         }),
       );
-      return c.json({ queued: false, direct: true, id, page }, 202);
+      return c.json({ queued: false, direct: true, id }, 202);
     }
-    return c.json({ queued: true, id, page }, 202);
+    return c.json({ queued: true, id }, 202);
   });
 }
