@@ -152,16 +152,12 @@ function UsernameHistoryCard({ entries }: { entries: UsernameHistoryEntry[] }) {
               const earliestDate = earliest ? new Date(earliest.changedAt) : latestChange;
               return (
                 <li key={entry.id} className="relative">
-                  <span className="inline-flex items-center rounded-full">
-                    <span
-                      className={cn(
-                        "text-base font-medium ms-0.75",
-                        `text-luogu-${(entry.snapshot.color ?? "gray").toLowerCase()}`,
-                      )}
-                    >
-                      {entry.snapshot.name}
-                    </span>
-                  </span>
+                  <UserInlineLink
+                    user={{ ...entry.snapshot, avatar: "" }}
+                    compact
+                    avatar={false}
+                    link={false}
+                  />
                   <div
                     className={cn(
                       "mt-1 flex flex-wrap gap-x-3 text-[11px] leading-none text-muted-foreground/80",

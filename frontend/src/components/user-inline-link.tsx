@@ -20,24 +20,21 @@ export default function UserInlineLink({
   avatar = true,
   compact = false,
   className,
+  link = true,
 }: {
   user: AuthorInfo | null;
   avatar?: boolean;
   compact?: boolean;
   className?: string;
+  /** 原版 UserInlineDisplay（纯展示）与 UserInlineLink（带链接）的区分 */
+  link?: boolean;
 }) {
   if (!user) {
     return <span className="text-foreground">匿名用户</span>;
   }
   const displayBadge = displayBadgeOf(user);
-  return (
-    <Link
-      href={`/u/${String(user.id)}`}
-      className={cn(
-        "inline-flex items-center rounded-full transition-colors duration-200 hover:bg-primary/10",
-        className,
-      )}
-    >
+  const content = (
+    <>
       {avatar ? (
         <img
           src={getLuoguAvatar(user.id)}
@@ -85,6 +82,26 @@ export default function UserInlineLink({
           )}
         />
       ) : null}
-    </Link>
+    </>
+  );
+  if (link) {
+    return (
+      <Link
+        href={`/u/${String(user.id)}`}
+        className={cn(
+          "inline-flex items-center rounded-full transition-colors duration-200 hover:bg-primary/10",
+          className,
+        )}
+      >
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <span
+      className={cn("inline-flex items-center rounded-full", className)}
+    >
+      {content}
+    </span>
   );
 }
