@@ -434,16 +434,17 @@ export function DiscussionPage({
     return (
       <Centered>
         <p className="text-sm text-destructive">{error}</p>
-        {refreshing ? (
-          <p className="mt-2 text-sm text-muted-foreground">该帖尚未归档，已加入抓取队列，正在等待（通常需 1~3 分钟）…</p>
-        ) : null}
       </Centered>
     );
   }
   if (!post) {
     return (
       <Centered>
-        <p className="text-sm text-muted-foreground">{refreshing ? "该帖尚未归档，正在抓取…" : "加载中…"}</p>
+        <p className="text-sm text-muted-foreground">
+          {refreshing
+            ? "该帖尚未归档，已加入抓取队列，正在等待（通常需 1~3 分钟）…"
+            : "加载中…"}
+        </p>
       </Centered>
     );
   }
@@ -668,7 +669,6 @@ async function crawlAndWait(
   setRefreshing: (v: boolean) => void,
 ): Promise<void> {
   setRefreshing(true);
-  setError("该帖尚未归档，已加入抓取队列，正在等待（通常需 1~3 分钟）…");
   try {
     await api.crawl(id);
   } catch {
