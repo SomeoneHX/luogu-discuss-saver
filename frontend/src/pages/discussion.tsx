@@ -247,6 +247,9 @@ export function DiscussionPage({
   const [refreshing, setRefreshing] = React.useState(false);
   const [waybackOpen, setWaybackOpen] = React.useState(false);
   const [isMetaPinned, setIsMetaPinned] = React.useState(false);
+  // sentinel 节点本身作为 effect 依赖：详情未加载完时组件会提前 return，
+  // 此时节点还不存在，用 getElementById 会错过挂载时机而永久监听不上。
+  const [sentinelNode, setSentinelNode] = React.useState<HTMLDivElement | null>(null);
 
   const load = React.useCallback(async () => {
     setError("");
@@ -293,10 +296,16 @@ export function DiscussionPage({
     setLoadingMore(true);
     try {
       const r = await api.replies(id, PAGE_SIZE, replies.length, replySort === "newest");
-      setReplies((prev) => {
-        const seen = new Set(prev.map((x) => x.id));
-        return [...prev, ...r.filter((x) => !seen.has(x.id))];
-      });
+      // 用当前已加载集合算新增量：不能在 setReplies 的 updater 里赋值，
+      // updater 是延迟执行的，那样读到的永远是 0。
+      const seen = new Set(replies.map((x) => x.id));
+      const fresh = r.filter((x) => !seen.has(x.id));
+      if (fresh.length === 0) {
+        // 本页没有带来新条目（翻页窗口漂移或已到末尾）→ 停止，避免空转重试
+        setHasMoreReplies(false);
+        return;
+      }
+      setReplies((prev) => [...prev, ...fresh]);
       setHasMoreReplies(r.length === PAGE_SIZE);
     } catch {
       /* 保持现状 */
@@ -307,18 +316,16 @@ export function DiscussionPage({
 
   // 滚动到底部自动续载下一页
   React.useEffect(() => {
-    if (!hasMoreReplies || replies.length === 0) return;
-    const sentinel = document.getElementById("replies-sentinel");
-    if (!sentinel) return;
+    if (!sentinelNode || !hasMoreReplies) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) void loadMoreReplies();
       },
       { rootMargin: "600px" },
     );
-    observer.observe(sentinel);
+    observer.observe(sentinelNode);
     return () => observer.disconnect();
-  }, [hasMoreReplies, replies.length, loadMoreReplies]);
+  }, [sentinelNode, hasMoreReplies, loadMoreReplies]);
 
   // 原版 layout 的 meta 悬浮判定
   React.useEffect(() => {
@@ -488,14 +495,21 @@ export function DiscussionPage({
                 </ol>
               )}
               {replies.length > 0 ? (
-                <div id="replies-sentinel" className="flex justify-center pt-2">
+                <div
+                  id="replies-sentinel"
+                  ref={setSentinelNode}
+                  className="flex justify-center pt-2"
+                >
                   {hasMoreReplies ? (
                     <span className="text-sm text-muted-foreground">
                       {loadingMore ? "正在加载更多回复…" : ""}
                     </span>
                   ) : (
                     <span className="text-xs text-muted-foreground/70">
-                      已加载全部 {replies.length.toLocaleString("zh-CN")} 条回复
+                      已显示全部 {replies.length.toLocaleString("zh-CN")} 条已归档回复
+                      {post.replyCount > replies.length
+                        ? `（洛谷共 ${post.replyCount.toLocaleString("zh-CN")} 条，其余尚未归档，可点「更新帖子」抓取）`
+                        : ""}
                     </span>
                   )}
                 </div>
