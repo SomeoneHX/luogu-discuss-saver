@@ -61,35 +61,6 @@ export const DiscoveryRun = sqliteTable(
   (t) => [index("DiscoveryRun_ranAt_idx").on(t.ranAt)],
 );
 
-// --------------------------- MaintenanceTask -------------------------------
-/**
- * 运维任务的长期执行入口。
- *
- * 约定：本地/运维侧只写一条 status='pending' 的记录作为「触发信号」，
- * 判定、执行与结果回写全部在 Worker 内完成（见 worker/src/maintenance.ts），
- * 因此没有长驻在本机的脚本，也没有面向公网的运维端点。
- */
-export const MaintenanceTask = sqliteTable(
-  "MaintenanceTask",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    /** 目前支持：purge-orphan-posts（删除只有维度行、从未落过快照的帖子）。 */
-    op: text("op").notNull(),
-    /** pending → queued → running → done | failed */
-    status: text("status").notNull().default("pending"),
-    requestedAt: integer("requestedAt", { mode: "timestamp" }).notNull(),
-    startedAt: integer("startedAt", { mode: "timestamp" }),
-    finishedAt: integer("finishedAt", { mode: "timestamp" }),
-    scanned: integer("scanned").notNull().default(0),
-    deletedPosts: integer("deletedPosts").notNull().default(0),
-    deletedReplies: integer("deletedReplies").notNull().default(0),
-    deletedReplySnapshots: integer("deletedReplySnapshots").notNull().default(0),
-    /** 执行明细（JSON 文本），便于事后核对删了什么、跳过了什么 */
-    detail: text("detail").notNull().default(""),
-  },
-  (t) => [index("MaintenanceTask_status_idx").on(t.status)],
-);
-
 // ------------------------------- User -------------------------------------
 
 export const User = sqliteTable("User", {
