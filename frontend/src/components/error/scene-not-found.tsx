@@ -14,7 +14,7 @@ export function DiscussionNotFound({ id }: { id: number }) {
     <NotFoundTemplate
       Icon={MessageSquareX}
       title="掘地三尺也找不到这条帖子！"
-      hint="这条讨论尚未收录或已被删除。如果您希望保存这条讨论，可以尝试点击下方按钮将其加入任务队列。"
+      hint="这条讨论尚未收录或已被删除。如果您希望保存这条讨论，可以尝试点击下方按钮将其加入任务队列。目前暂时无法保存题目讨论版：洛谷要求账号在对应题目有提交记录才能查看，因此这类帖子抓取时会被拒绝。"
       queueJobButtonProps={
         Number.isFinite(id)
           ? {
