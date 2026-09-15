@@ -10,6 +10,7 @@
 - **龙王榜**：近 20 天活跃用户排行
 - **用户页**：用户快照信息、发布/回复时间线
 - **按需抓取**：访问未归档帖子时提示，可通过「更新帖子」按钮手动触发抓取
+- **Markdown 渲染**：移植洛谷 Markdown 方言（@提及、B 站视频、提示块、洛谷表格与代码块）、LaTeX、代码高亮；链接带悬浮预览卡，@提及带「回复推断」浮层
 
 ## 架构
 
@@ -103,6 +104,8 @@ wrangler.toml             Pages 配置（pages_build_output_dir = "dist"）
 | GET  | `/api/discussions/:id/replies`  | 回复列表（`take` / `skip` / `order=newest` 分页） |
 | GET  | `/api/discussions/:id/timeline` | 快照时间线（游标分页）                               |
 | GET  | `/api/replies/:id`              | 单条回复 + 最新快照                               |
+| GET  | `/api/discussions/:id/reply-inference/:userId` | 回复推断：该用户在本帖的回复（`cursor` / `relativeTo` 定位，返回相邻回复 id） |
+| GET  | `/api/entries`                  | 批量条目元数据（`entry-ref=type:id`，Markdown 悬浮卡/@提及外显用，边缘缓存 60s） |
 | GET  | `/api/feed`                     | 信息流（游标分页，边缘缓存 60s）                        |
 | GET  | `/api/trending/explore`         | 探索列表（边缘缓存 60s）                            |
 | GET  | `/api/trending/recent`          | 最近归档（边缘缓存 60s）                            |

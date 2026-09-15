@@ -21,6 +21,7 @@ export default function UserInlineLink({
   compact = false,
   className,
   link = true,
+  nameColorOverride,
 }: {
   user: AuthorInfo | null;
   avatar?: boolean;
@@ -28,6 +29,8 @@ export default function UserInlineLink({
   className?: string;
   /** 原版 UserInlineDisplay（纯展示）与 UserInlineLink（带链接）的区分 */
   link?: boolean;
+  /** 覆盖名字颜色（原版用于 markdown 里的普通用户链接，固定 indigo） */
+  nameColorOverride?: string;
 }) {
   if (!user) {
     return <span className="text-foreground">匿名用户</span>;
@@ -47,7 +50,7 @@ export default function UserInlineLink({
         className={cn(
           "text-base font-medium",
           avatar ? (compact ? "ms-1" : "ms-1.5") : "ms-0.75",
-          `text-luogu-${colorOf(user)}`,
+          nameColorOverride ?? `text-luogu-${colorOf(user)}`,
         )}
       >
         {user.name}

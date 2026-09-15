@@ -15,6 +15,7 @@ import { schema } from "../db/client.js";
 import type { Env } from "../env.js";
 import { enqueue, type Job } from "../queue/jobs.js";
 import { getFeedPage } from "../query/feed.js";
+import { parseEntryRef, resolveEntries } from "../query/entries.js";
 import {
   getPostEntries,
   getPostRepliesWithLatestSnapshot,
@@ -22,6 +23,7 @@ import {
   getPostSnapshotsTimeline,
   getPostWithSnapshot,
   getReplyWithLatestSnapshot,
+  getUserReplyInference,
 } from "../query/discussion.js";
 import {
   getActiveDiscussions,
@@ -33,6 +35,12 @@ import {
   getUserTimelinePage,
   parseUserTimelineCursor,
 } from "../query/userProfile.js";
+
+function toPositiveInt(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const n = Number.parseInt(value, 10);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
 
 function toEpochSeconds(value: string | undefined): number | undefined {
   if (!value) return undefined;
@@ -160,6 +168,68 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
     if (!reply) return c.json({ error: "Reply not found" }, 404);
     return c.json(reply);
   });
+
+  // --- 回复推断：某用户在某帖里说了什么（@提及旁的「回复推断」浮层）---
+  app.get("/api/discussions/:id/reply-inference/:userId", async (c) => {
+    const postId = Number(c.req.param("id"));
+    const userId = Number(c.req.param("userId"));
+    if (!Number.isInteger(postId) || !Number.isInteger(userId)) {
+      return c.json({ error: "invalid id" }, 400);
+    }
+    const cursorRaw = c.req.query("cursor");
+    const relativeRaw = c.req.query("relativeTo");
+    const cursor = toPositiveInt(cursorRaw);
+    const relativeTo = toPositiveInt(relativeRaw);
+    // 与原版一致：参数存在但非法 → 400（absent 才回退到「最新一条」语义）
+    if ((cursorRaw !== undefined && cursor === undefined) || (relativeRaw !== undefined && relativeTo === undefined)) {
+      return c.json({ error: "Invalid cursor parameters" }, 400);
+    }
+    const result = await getUserReplyInference(getDb(c.env), {
+      postId,
+      userId,
+      ...(cursor !== undefined ? { cursorReplyId: cursor } : {}),
+      ...(relativeTo !== undefined ? { relativeToReplyId: relativeTo } : {}),
+    });
+    if (!result.current) {
+      return c.json({ error: "No reply found for the requested user" }, 404);
+    }
+    const reply = result.current;
+    const latestSnapshot = reply.snapshots[0];
+    const authorSnapshot = reply.author;
+    if (!latestSnapshot) {
+      return c.json({ error: "No snapshot for the requested reply" }, 404);
+    }
+    return c.json({
+      reply: {
+        id: reply.id,
+        postId: reply.postId,
+        time: Math.floor(reply.time.getTime() / 1000),
+        content: latestSnapshot.content,
+        capturedAt: Math.floor(latestSnapshot.capturedAt.getTime() / 1000),
+        lastSeenAt: Math.floor(latestSnapshot.lastSeenAt.getTime() / 1000),
+        authorId: reply.authorId,
+        author: authorSnapshot,
+        snapshotsCount: reply._count.snapshots,
+      },
+      previousReplyId: result.previousReplyId,
+      nextReplyId: result.nextReplyId,
+      hasPrevious: Boolean(result.previousReplyId),
+      hasNext: Boolean(result.nextReplyId),
+    });
+  });
+
+  // --- 批量条目元数据（Markdown 链接 / @提及的悬浮卡与用户外显）---
+  app.get("/api/entries", async (c) =>
+    withEdgeCache(c, 60, async () => {
+      const raw = c.req.queries("entry-ref") ?? [];
+      const refs = raw
+        .map((item) => parseEntryRef(item))
+        .filter((ref): ref is NonNullable<typeof ref> => ref !== null)
+        .slice(0, 50);
+      if (!refs.length) return c.json([]);
+      return c.json(await resolveEntries(getDb(c.env), refs));
+    }),
+  );
 
   // --- 推荐列表：「最近」（近 7 天热度）---
   app.get("/api/trending/recent", async (c) =>

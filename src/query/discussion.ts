@@ -333,6 +333,172 @@ export async function getReplyWithLatestSnapshot(db: Db, replyId: number) {
   };
 }
 
+type ReplyCursorCandidate = {
+  id: number;
+  postId: number;
+  authorId: number;
+  time: Date;
+};
+
+function buildBeforeCursorWhere(
+  postId: number,
+  authorId: number,
+  cursor: ReplyCursorCandidate,
+) {
+  return and(
+    eq(schema.Reply.postId, postId),
+    eq(schema.Reply.authorId, authorId),
+    or(
+      lt(schema.Reply.time, cursor.time),
+      and(eq(schema.Reply.time, cursor.time), lt(schema.Reply.id, cursor.id)),
+    ),
+  );
+}
+
+function buildAfterCursorWhere(
+  postId: number,
+  authorId: number,
+  cursor: ReplyCursorCandidate,
+) {
+  return and(
+    eq(schema.Reply.postId, postId),
+    eq(schema.Reply.authorId, authorId),
+    or(
+      gt(schema.Reply.time, cursor.time),
+      and(eq(schema.Reply.time, cursor.time), gt(schema.Reply.id, cursor.id)),
+    ),
+  );
+}
+
+/**
+ * 解析推断游标（1:1 对照原版 packages/query/src/discussion.ts）：
+ * - 给定 cursorReplyId：直接取该回复（校验属于该帖与该用户）；
+ * - 给定 relativeToReplyId：取该楼的**上一条**该用户回复；没有则取下一条；
+ * - 都没有：取该用户在该帖的**最新**一条回复。
+ */
+async function resolveReplyCursor(
+  db: Db,
+  {
+    postId,
+    authorId,
+    cursorReplyId,
+    relativeToReplyId,
+  }: {
+    postId: number;
+    authorId: number;
+    cursorReplyId?: number;
+    relativeToReplyId?: number;
+  },
+): Promise<ReplyCursorCandidate | null> {
+  const baseSelect = {
+    id: schema.Reply.id,
+    postId: schema.Reply.postId,
+    authorId: schema.Reply.authorId,
+    time: schema.Reply.time,
+  };
+
+  if (cursorReplyId !== undefined) {
+    const [cursor] = await db
+      .select(baseSelect)
+      .from(schema.Reply)
+      .where(eq(schema.Reply.id, cursorReplyId))
+      .limit(1);
+    if (!cursor) return null;
+    if (cursor.postId !== postId || cursor.authorId !== authorId) return null;
+    return cursor;
+  }
+
+  if (relativeToReplyId !== undefined) {
+    const [relative] = await db
+      .select(baseSelect)
+      .from(schema.Reply)
+      .where(eq(schema.Reply.id, relativeToReplyId))
+      .limit(1);
+    if (!relative) return null;
+
+    const [candidateBefore] = await db
+      .select(baseSelect)
+      .from(schema.Reply)
+      .where(buildBeforeCursorWhere(postId, authorId, relative))
+      .orderBy(desc(schema.Reply.time), desc(schema.Reply.id))
+      .limit(1);
+    if (candidateBefore) return candidateBefore;
+
+    const [candidateAfter] = await db
+      .select(baseSelect)
+      .from(schema.Reply)
+      .where(buildAfterCursorWhere(postId, authorId, relative))
+      .orderBy(asc(schema.Reply.time), asc(schema.Reply.id))
+      .limit(1);
+    if (candidateAfter) return candidateAfter;
+
+    return null;
+  }
+
+  const [latest] = await db
+    .select(baseSelect)
+    .from(schema.Reply)
+    .where(
+      and(eq(schema.Reply.postId, postId), eq(schema.Reply.authorId, authorId)),
+    )
+    .orderBy(desc(schema.Reply.time), desc(schema.Reply.id))
+    .limit(1);
+
+  return latest ?? null;
+}
+
+/**
+ * 「回复推断」：某用户在某帖里说了什么（@提及旁的小按钮用）。
+ * 返回当前定位到的回复 + 该用户相邻的上一条/下一条回复 id。
+ */
+export async function getUserReplyInference(
+  db: Db,
+  {
+    postId,
+    userId,
+    cursorReplyId,
+    relativeToReplyId,
+  }: {
+    postId: number;
+    userId: number;
+    cursorReplyId?: number;
+    relativeToReplyId?: number;
+  },
+) {
+  const cursor = await resolveReplyCursor(db, {
+    postId,
+    authorId: userId,
+    ...(cursorReplyId !== undefined ? { cursorReplyId } : {}),
+    ...(relativeToReplyId !== undefined ? { relativeToReplyId } : {}),
+  });
+
+  if (!cursor) {
+    return { current: null, previousReplyId: null, nextReplyId: null } as const;
+  }
+
+  const [current, previousRows, nextRows] = await Promise.all([
+    getReplyWithLatestSnapshot(db, cursor.id),
+    db
+      .select({ id: schema.Reply.id })
+      .from(schema.Reply)
+      .where(buildBeforeCursorWhere(postId, userId, cursor))
+      .orderBy(desc(schema.Reply.time), desc(schema.Reply.id))
+      .limit(1),
+    db
+      .select({ id: schema.Reply.id })
+      .from(schema.Reply)
+      .where(buildAfterCursorWhere(postId, userId, cursor))
+      .orderBy(asc(schema.Reply.time), asc(schema.Reply.id))
+      .limit(1),
+  ]);
+
+  return {
+    current,
+    previousReplyId: previousRows[0]?.id ?? null,
+    nextReplyId: nextRows[0]?.id ?? null,
+  } as const;
+}
+
 export async function getPostSnapshotsTimeline(
   db: Db,
   postId: number,

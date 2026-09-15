@@ -7,6 +7,7 @@ import remarkMath from "remark-math";
 
 import remarkLuoguFlavor from "../../vendor/remark-lda-lfm/index.js";
 
+import { MentionContext, type MarkdownMentionContext } from "../lib/mention-context";
 import { cn } from "../lib/utils";
 
 import MarkdownCodeBlock from "./markdown/markdown-code-block";
@@ -17,14 +18,7 @@ import "katex/dist/katex.min.css";
 import "./markdown.css";
 import "./highlight.css";
 
-export type MarkdownDiscussionMentionContext = {
-  kind: "discussion";
-  discussionId: number;
-  relativeReplyId?: number;
-  discussionAuthors: number[];
-};
-
-export type MarkdownMentionContext = MarkdownDiscussionMentionContext;
+export type { MarkdownMentionContext } from "../lib/mention-context";
 
 type MarkdownProps = {
   children: string;
@@ -150,6 +144,7 @@ export default function Markdown({
   originalUrl,
   compact = false,
   enableHeadingAnchors = false,
+  mentionContext,
 }: MarkdownProps) {
   const headingSlugCounter: Record<string, number> = {};
 
@@ -219,6 +214,7 @@ export default function Markdown({
 
   return (
     <div className={cn("markdown-body", compact ? "markdown-body-compact" : "")}>
+      <MentionContext.Provider value={mentionContext}>
       <ReactMarkdown
         remarkPlugins={[
           [remarkMath, {}],
@@ -271,7 +267,7 @@ export default function Markdown({
           a(props) {
             const { node, ...rest } = props;
             void node;
-            return <MarkdownLink {...rest} />;
+            return <MarkdownLink originalUrl={originalUrl} {...rest} />;
           },
           summary(props) {
             const { node, children, ...rest } = props;
@@ -292,6 +288,7 @@ export default function Markdown({
       >
         {children}
       </ReactMarkdown>
+      </MentionContext.Provider>
     </div>
   );
 }
