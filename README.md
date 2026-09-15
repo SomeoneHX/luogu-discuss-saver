@@ -71,7 +71,7 @@ src/                      共用逻辑（Pages 与 Worker 都引用）
 ├── crawler/
 │   ├── http.ts           .cn 域 + content-only 头 + cookie + C3VK 回环
 │   ├── lentille.ts       提取 <script id="lentille-context"> JSON
-│   ├── discuss.ts        fetchDiscuss / listDiscuss（持久化入口）
+│   ├── discuss.ts        fetchDiscuss（逐帖抓取 + 落库）/ fetchDiscussList（只读列表）
 │   ├── persist.ts        快照持久化（DO 与回退路径共用）
 │   └── user.ts / problem.ts / types.ts / errors.ts / utils.ts
 ├── durable/postLockerInterface.ts   DO 接口（实现见 worker/）
@@ -115,7 +115,7 @@ wrangler.toml             Pages 配置（pages_build_output_dir = "dist"）
 | GET  | `/api/users/:id/timeline`       | 用户时间线（游标分页）                               |
 | POST | `/api/discussions/:id/crawl`    | 触发抓取（入队；按帖冷却 `CRAWL_COOLDOWN_SECONDS`，默认 300s；队列不可用返回 503） |
 | —    | Worker cron `0 * * * *` → 发现任务 | 自动追更：掷骰 + 随机延迟 + 置顶降级/delta/冷却闸门（不在 Pages 暴露 HTTP 入口） |
-| GET  | `/api/health/luogu`             | 取数通路 + cookie 健康检查                        |
+| GET  | `/api/health/luogu`             | 取数通路 + cookie 健康检查（只读，不写库）              |
 
 ## 部署
 

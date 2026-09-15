@@ -251,9 +251,9 @@ export async function fetchDiscuss(
   };
 }
 
-// -------------------------------- listDiscuss ------------------------------
+// ------------------------------- 讨论列表（只读） ------------------------------
 
-/** 拉取并解析讨论列表（不落库）。落库见 persistDiscussList / listDiscuss。 */
+/** 拉取并解析讨论列表（只读：不写库；落库只发生在逐帖抓取 fetchDiscuss 里）。 */
 export async function fetchDiscussList(
   env: Env,
   forum: string | null = null,
@@ -270,46 +270,6 @@ export async function fetchDiscussList(
     throw new UnexpectedStatusError("Unexpected status", "/discuss", status);
   }
   return { posts: (data.posts?.result ?? []) as PostSummary[], time };
-}
-
-/** 列表元数据落库（Forum/Problem/User/Post/Reply 行 upsert，满足外键）。 */
-export async function persistDiscussList(
-  env: Env,
-  posts: PostSummary[],
-  time: number,
-): Promise<void> {
-  const now = new Date(time * 1000);
-  const db = getDb(env);
-
-  await saveForums(
-    db,
-    posts.map((post) => post.forum),
-    now,
-  );
-  await saveUserSnapshots(
-    db,
-    posts
-      .flatMap((post) => (post.recentReply ? [post, post.recentReply] : [post]))
-      .map(({ author }) => author),
-    now,
-  );
-  await savePosts(db, posts, now);
-  await saveReplyRows(
-    db,
-    posts.flatMap(({ id, recentReply }) =>
-      recentReply ? [{ postId: id, reply: recentReply }] : [],
-    ),
-  );
-}
-
-export async function listDiscuss(
-  env: Env,
-  forum: string | null = null,
-  page?: number,
-): Promise<PostSummary[]> {
-  const { posts, time } = await fetchDiscussList(env, forum, page);
-  await persistDiscussList(env, posts, time);
-  return posts;
 }
 
 // ------------------------------ 已归档回复数 ------------------------------

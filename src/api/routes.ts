@@ -9,7 +9,7 @@ import { eq, max } from "drizzle-orm";
 
 import type { Hono } from "hono";
 
-import { listDiscuss } from "../crawler/discuss.js";
+import { fetchDiscussList } from "../crawler/discuss.js";
 import { getDb } from "../db/client.js";
 import { schema } from "../db/client.js";
 import type { Env } from "../env.js";
@@ -69,10 +69,10 @@ async function withEdgeCache(
 }
 
 export function registerApi(app: Hono<{ Bindings: Env }>): void {
-  // --- 健康检查：验证 Pages 侧到洛谷的取数通路 + cookie ---
+  // --- 健康检查：验证 Pages 侧到洛谷的取数通路 + cookie（只读，不写库）---
   app.get("/api/health/luogu", async (c) => {
     try {
-      const posts = await listDiscuss(c.env, null, 1);
+      const { posts } = await fetchDiscussList(c.env, null, 1);
       return c.json({ ok: true, count: posts.length });
     } catch (error) {
       return c.json({ ok: false, error: (error as Error).message }, 502);
