@@ -73,7 +73,13 @@ async function fetchMentionReply(params: {
   if (params.cursor) url.searchParams.set("cursor", String(params.cursor));
   if (params.relativeTo) url.searchParams.set("relativeTo", String(params.relativeTo));
   const response = await fetch(url.toString(), { cache: "no-store" });
-  if (!response.ok) throw new Error("Failed to load mention reply");
+  if (response.status === 404) {
+    // 该用户在本帖没有任何回复可推断（原版此处会直接把英文错误抛给用户）
+    throw new Error("这位用户在本帖里没有回复，无法推断上下文");
+  }
+  if (!response.ok) {
+    throw new Error(`加载失败，请稍后再试（HTTP ${String(response.status)}）`);
+  }
   return (await response.json()) as MentionReplyInferenceResult;
 }
 
@@ -117,7 +123,7 @@ export function MentionReplyOverlayTrigger({
         });
         setData(result);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "加载失败");
+        setError(err instanceof Error ? err.message : "加载失败，请稍后再试");
       } finally {
         setLoading(false);
       }
