@@ -22,4 +22,24 @@ export interface Env {
   CRAWL_COOLDOWN_SECONDS?: string;
   /** 旧帖增量抓取阈值，默认 5。 */
   REPLY_DELTA_THRESHOLD?: string;
+
+  // ---- 自动发现（低频率 + 随机化）----
+  /** 总开关，字符串 "true" 才启用。 */
+  DISCOVERY_ENABLED?: string;
+  /** 每次 cron 唤醒真正执行发现轮的概率（0~1），默认 0.33。 */
+  DISCOVERY_PROBABILITY?: string;
+  /** 夜间（北京时间 0~7 点）执行概率，默认 0（不做昼夜不停的机器）。 */
+  DISCOVERY_NIGHT_PROBABILITY?: string;
+  /** 发现轮随机延迟上限（秒），把执行时刻打散，默认 1800。 */
+  DISCOVERY_DELAY_MAX_SECONDS?: string;
+  /** 发现轮读取列表页数，默认 2。 */
+  DISCOVERY_LIST_PAGES?: string;
+  /** 单轮最多入队多少个帖子，默认 5。 */
+  DISCOVERY_MAX_POSTS?: string;
+  /** 按帖冷却下限（秒），默认 1800。 */
+  DISCOVERY_POST_COOLDOWN_SECONDS?: string;
+  /** 估算每页抓取耗时（秒），用于按帖子规模放大冷却，默认 20。 */
+  DISCOVERY_SECONDS_PER_PAGE?: string;
+  /** 入队时的随机错峰上限（秒），默认 30。 */
+  DISCOVERY_STAGGER_MAX_SECONDS?: string;
 }

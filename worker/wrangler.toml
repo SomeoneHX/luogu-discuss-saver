@@ -38,6 +38,29 @@ class_name = "PostLocker"
 tag = "v1"
 new_sqlite_classes = ["PostLocker"]
 
+# 定时唤醒：cron 只是「掷骰机会」，真正执行由 DISCOVERY_PROBABILITY 决定，
+# 且通过后再入队一条带 0~30 分钟随机延迟的发现任务 → 实际访问洛谷的时刻是随机的。
+[triggers]
+crons = ["0 * * * *"]
+
 [vars]
 CRAWL_MIN_INTERVAL_MS = "6000"
 REPLY_DELTA_THRESHOLD = "5"
+
+# ---- 自动发现（低频率 + 随机化）----
+DISCOVERY_ENABLED = "true"
+# 每小时唤醒后真正执行发现轮的概率（约 1/3 → 平均 3 小时一轮）
+DISCOVERY_PROBABILITY = "0.33"
+# 北京时间 0~7 点不执行（避免昼夜不停的机器节律）
+DISCOVERY_NIGHT_PROBABILITY = "0"
+# 发现任务入队时的随机延迟上限（秒）
+DISCOVERY_DELAY_MAX_SECONDS = "1800"
+# 读取的洛谷列表页数（每页约 25 条）
+DISCOVERY_LIST_PAGES = "2"
+# 单轮最多入队帖子数
+DISCOVERY_MAX_POSTS = "5"
+# 按帖冷却下限（秒）；实际冷却 = max(该值, 帖子页数 × DISCOVERY_SECONDS_PER_PAGE)
+DISCOVERY_POST_COOLDOWN_SECONDS = "1800"
+DISCOVERY_SECONDS_PER_PAGE = "20"
+# 入队时的随机错峰上限（秒）
+DISCOVERY_STAGGER_MAX_SECONDS = "30"

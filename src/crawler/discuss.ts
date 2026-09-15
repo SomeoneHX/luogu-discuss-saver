@@ -7,7 +7,7 @@
  *   - 维度表（Forum/Problem/User/Post/Reply 行）仍在此处 upsert，保证 FK 满足。
  */
 
-import { count, eq, inArray } from "drizzle-orm";
+import { count, eq, inArray, max } from "drizzle-orm";
 
 import { getDb, type Db } from "../db/client.js";
 import { schema } from "../db/client.js";
@@ -339,6 +339,33 @@ export async function getExistingPostIds(
     .from(schema.Post)
     .where(inArray(schema.Post.id, postIds));
   return new Set(rows.map((r) => r.id));
+}
+
+/** 各帖最近一次快照确认时间（用于自动发现的按帖冷却）。
+ *  注：自动发现的「进度」概念用 Post 维度行的 updatedAt 近似，快照表按 postId 取 max。 */
+export async function getPostLastSeenAt(
+  db: Db,
+  postIds: number[],
+): Promise<Map<number, Date>> {
+  if (!postIds.length) return new Map();
+  const rows: { postId: number; lastSeen: Date | null }[] = [];
+  // D1 单查询绑定参数上限 100
+  for (let i = 0; i < postIds.length; i += 90) {
+    const batch = postIds.slice(i, i + 90);
+    if (!batch.length) continue;
+    const part = await db
+      .select({
+        postId: schema.PostSnapshot.postId,
+        lastSeen: max(schema.PostSnapshot.lastSeenAt),
+      })
+      .from(schema.PostSnapshot)
+      .where(inArray(schema.PostSnapshot.postId, batch))
+      .groupBy(schema.PostSnapshot.postId);
+    rows.push(...part);
+  }
+  return new Map(
+    rows.flatMap((r) => (r.lastSeen ? [[r.postId, r.lastSeen] as const] : [])),
+  );
 }
 
 export { eq };

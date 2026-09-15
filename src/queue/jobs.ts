@@ -7,10 +7,15 @@
 
 import type { Env } from "../env.js";
 
-export type Job = { type: "discuss"; id: number; page?: number };
+export type DiscussJob = { type: "discuss"; id: number; page?: number };
+/** 发现轮：拉取讨论列表，挑出落后/新增的帖子并入队抓取。 */
+export type DiscoverJob = { type: "discover" };
+export type Job = DiscussJob | DiscoverJob;
 
 export function jobLabel(job: Job): string {
-  return `discuss:${String(job.id)}:${String(job.page ?? 1)}`;
+  return job.type === "discover"
+    ? "discover"
+    : `discuss:${String(job.id)}:${String(job.page ?? 1)}`;
 }
 
 export interface EnqueueOptions {
