@@ -50,7 +50,10 @@ export default function CommentCard({
   const [copied, copy] = useClipboard();
   const content = reply.snapshots[0]?.content ?? "";
   return (
-    <article id={`reply-${String(reply.id)}`} className={className}>
+    <article
+      id={`reply-${String(reply.id)}`}
+      className={cn("scroll-mt-20", className)}
+    >
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
           {reply.author ? <UserInlineLink user={reply.author} /> : null}

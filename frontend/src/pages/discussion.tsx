@@ -14,7 +14,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { Link } from "../App";
+import { Link, scrollToAnchor } from "../App";
 import { api, type PostDetail, type PostSnapshotInfo, type ReplyInfo } from "../lib/api";
 import { ABSOLUTE_DATE_FORMATTER, cn, formatRelativeTime } from "../lib/utils";
 import Markdown from "../components/markdown";
@@ -24,6 +24,8 @@ import UserInlineLink from "../components/user-inline-link";
 import { ForumDisplay, ForumDisplayShort } from "../components/forum-display";
 
 const PAGE_SIZE = 15;
+/** 锚点跳转时最多自动续载多少页（15 条/页） */
+const ANCHOR_MAX_LOADS = 20;
 
 /** 原版 meta-row.tsx 同款 */
 function DiscussionMetaRow({
@@ -313,6 +315,31 @@ export function DiscussionPage({
       setLoadingMore(false);
     }
   }, [id, replies.length, replySort, loadingMore]);
+
+  // 锚点（#reply-<id>）指向的回复若还没加载出来，自动续载直到它出现（有上限）。
+  // 原版用 anchor 感知的接口直接跳到目标页，我们复用同一套分页：继续向后取。
+  const anchorLoadRef = React.useRef(0);
+  const anchorScrolledRef = React.useRef(false);
+  React.useEffect(() => {
+    const match = /#reply-(\d+)/.exec(window.location.hash);
+    if (!match || !replies.length) return;
+    const anchorId = Number(match[1]);
+
+    if (!replies.some((reply) => reply.id === anchorId)) {
+      // 目标还没加载出来 → 继续向后取（有上限），出现后由下面这段负责滚动
+      if (!hasMoreReplies || loadingMore || anchorLoadRef.current >= ANCHOR_MAX_LOADS) return;
+      anchorLoadRef.current += 1;
+      void loadMoreReplies();
+      return;
+    }
+
+    if (anchorScrolledRef.current) return;
+    anchorScrolledRef.current = true;
+    // 等 DOM 落位后再滚（顶栏偏移由 scrollToAnchor 统一处理）
+    requestAnimationFrame(() => {
+      scrollToAnchor(`reply-${String(anchorId)}`);
+    });
+  }, [replies, hasMoreReplies, loadingMore, loadMoreReplies]);
 
   // 滚动到底部自动续载下一页
   React.useEffect(() => {

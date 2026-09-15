@@ -44,11 +44,42 @@ export function Link({
   );
 }
 
+/** 吸顶头部高度（含下边框）之外的留白 */
+const ANCHOR_EXTRA_OFFSET = 12;
+
+function headerOffset(): number {
+  const header = document.querySelector("header");
+  const height = header instanceof HTMLElement ? header.getBoundingClientRect().height : 0;
+  return (height > 0 ? height : 64) + ANCHOR_EXTRA_OFFSET;
+}
+
+/** 滚动到锚点：目标元素可能由异步数据渲染，轮询等待出现；位置需让开吸顶栏。 */
+export function scrollToAnchor(hash: string): void {
+  // 容忍 `#reply-1?x=y` 这类把查询串写在 hash 后面的写法
+  const id = hash.split(/[?&]/)[0] ?? hash;
+  let tries = 0;
+  const step = (): void => {
+    const el = document.getElementById(id);
+    if (el) {
+      const top = el.getBoundingClientRect().top + window.scrollY - headerOffset();
+      window.scrollTo(0, Math.max(0, top));
+      return;
+    }
+    if (tries++ < 20) setTimeout(step, 150);
+  };
+  setTimeout(step, 50);
+}
+
 function usePathname(): [string, (p: string) => void] {
   const [pathname, setPathname] = React.useState(window.location.pathname);
   React.useEffect(() => {
-    const onPop = () => setPathname(window.location.pathname);
+    const onPop = () => {
+      setPathname(window.location.pathname);
+      if (window.location.hash) scrollToAnchor(window.location.hash.slice(1));
+    };
     window.addEventListener("popstate", onPop);
+    // 直接带 #reply-x 打开页面时也要滚动（内容异步渲染，等元素出现）
+    if (window.location.hash) scrollToAnchor(window.location.hash.slice(1));
     return () => window.removeEventListener("popstate", onPop);
   }, []);
   return [pathname, setPathname];
@@ -66,17 +97,7 @@ export function App() {
       setPathname(path);
       const hash = url.hash.slice(1);
       if (hash) {
-        // 目标锚点所在页面内容是异步加载的，轮询等元素出现后再滚动
-        let tries = 0;
-        const scrollToAnchor = (): void => {
-          const el = document.getElementById(hash);
-          if (el) {
-            el.scrollIntoView();
-          } else if (tries++ < 20) {
-            setTimeout(scrollToAnchor, 150);
-          }
-        };
-        setTimeout(scrollToAnchor, 50);
+        scrollToAnchor(hash);
       } else {
         window.scrollTo(0, 0);
       }
