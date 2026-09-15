@@ -19,6 +19,7 @@ import { api, type PostDetail, type PostSnapshotInfo, type ReplyInfo } from "../
 import { ABSOLUTE_DATE_FORMATTER, cn, formatRelativeTime } from "../lib/utils";
 import Markdown from "../components/markdown";
 import CommentCard, { useClipboard } from "../components/comment-card";
+import { DiscussionNotFound } from "../components/error/scene-not-found";
 import { MetaItem } from "../components/meta-item";
 import UserInlineLink from "../components/user-inline-link";
 import { ForumDisplay, ForumDisplayShort } from "../components/forum-display";
@@ -248,6 +249,8 @@ export function DiscussionPage({
   const [error, setError] = React.useState("");
   const [refreshing, setRefreshing] = React.useState(false);
   const [waybackOpen, setWaybackOpen] = React.useState(false);
+  // 「未收录/已删除」：与原版一致，落到讨论未找到页（不再自动入队抓取）
+  const [notFound, setNotFound] = React.useState(false);
   const [isMetaPinned, setIsMetaPinned] = React.useState(false);
   // sentinel 节点本身作为 effect 依赖：详情未加载完时组件会提前 return，
   // 此时节点还不存在，用 getElementById 会错过挂载时机而永久监听不上。
@@ -257,13 +260,19 @@ export function DiscussionPage({
     setError("");
     try {
       const detail = await api.discussion(id);
+      // 原版 getDiscussionData 直接读 snapshots[0]，没有快照等同「不存在」→ notFound
+      if (detail.snapshots.length === 0) {
+        setNotFound(true);
+        setPost(null);
+        return;
+      }
       document.title = `${detail.snapshots[0]?.title ?? `#${String(id)}`} · 洛谷帖子保存站`;
       setPost(detail);
     } catch (err) {
       const e = err as Error & { status?: number };
       if (e.status === 404 || /not found/i.test(e.message)) {
+        setNotFound(true);
         setPost(null);
-        await crawlAndWait(id, setError, setRefreshing);
       } else {
         setError(e.message);
       }
@@ -393,6 +402,9 @@ export function DiscussionPage({
     }
   }
 
+  if (notFound) {
+    return <DiscussionNotFound id={id} />;
+  }
   if (error && !post) {
     return (
       <Centered>
@@ -403,11 +415,7 @@ export function DiscussionPage({
   if (!post) {
     return (
       <Centered>
-        <p className="text-sm text-muted-foreground">
-          {refreshing
-            ? "该帖尚未归档，已加入抓取队列，正在等待（通常需 1~3 分钟）…"
-            : "加载中…"}
-        </p>
+        <p className="text-sm text-muted-foreground">加载中…</p>
       </Centered>
     );
   }
@@ -641,31 +649,6 @@ export function DiscussionPage({
       </div>
     </div>
   );
-}
-
-async function crawlAndWait(
-  id: number,
-  setError: (msg: string) => void,
-  setRefreshing: (v: boolean) => void,
-): Promise<void> {
-  setRefreshing(true);
-  try {
-    await api.crawl(id);
-  } catch {
-    /* 入队失败也继续轮询，可能已在队列中 */
-  }
-  for (let i = 0; i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 6000));
-    try {
-      await api.discussion(id);
-      window.location.reload();
-      return;
-    } catch {
-      /* 继续等待 */
-    }
-  }
-  setError("2 分钟内未完成抓取：帖子可能已删除、需要权限，或队列繁忙。稍后重新输入 ID 可再试。");
-  setRefreshing(false);
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

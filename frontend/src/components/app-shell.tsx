@@ -113,6 +113,10 @@ function breadcrumbs(pathname: string): { label: string; href?: string }[] {
   else if (first === "d") {
     crumbs.push({ label: "讨论" });
     if (second) crumbs.push({ label: `#${second}` });
+  } else if (first === "a") {
+    crumbs.push({ label: "文章" });
+  } else if (first === "p") {
+    crumbs.push({ label: "云剪贴板" });
   } else if (first === "u") {
     crumbs.push({ label: "用户" });
     if (second) crumbs.push({ label: `@${second}`, href: `/u/${second}` });

@@ -5,6 +5,7 @@ import { Link } from "../App";
 import { api, type TimelineEntry, type UserTimelinePage, type UserProfileBundle, type UsernameHistoryEntry } from "../lib/api";
 import { cn, formatRelativeTime } from "../lib/utils";
 import UserInlineLink from "../components/user-inline-link";
+import { UserNotFound } from "../components/error/scene-not-found";
 
 /** 原版 user-info-card.tsx 同款 */
 function UserInfoCard({ profile }: { profile: UserProfileBundle["profile"] }) {
@@ -363,6 +364,8 @@ function UserTimeline({
 export function UserPage({ id }: { id: number }) {
   const [bundle, setBundle] = React.useState<UserProfileBundle | null>(null);
   const [error, setError] = React.useState("");
+  // 「尚未收录」：与原版一致，落到用户未找到页
+  const [notFound, setNotFound] = React.useState(false);
 
   React.useEffect(() => {
     api
@@ -371,9 +374,15 @@ export function UserPage({ id }: { id: number }) {
         document.title = `@${data.profile.name} · 洛谷帖子保存站`;
         setBundle(data);
       })
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error & { status?: number }) => {
+        if (e.status === 404 || /not found/i.test(e.message)) setNotFound(true);
+        else setError(e.message);
+      });
   }, [id]);
 
+  if (notFound) {
+    return <UserNotFound />;
+  }
   if (error) {
     return <Centered><p className="text-sm text-destructive">加载失败：{error}</p></Centered>;
   }

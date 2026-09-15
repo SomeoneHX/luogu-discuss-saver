@@ -1,6 +1,13 @@
 import * as React from "react";
 import { AppShell } from "./components/app-shell";
 import { DiscussionPage } from "./pages/discussion";
+import {
+  ArticleNotFound,
+  DefaultNotFound,
+  DiscussionNotFound,
+  PasteNotFound,
+  UserNotFound,
+} from "./components/error/scene-not-found";
 import { HomePage } from "./pages/home";
 import { ExplorePage, RecentPage } from "./pages/trending";
 import { UserPage } from "./pages/user";
@@ -118,15 +125,29 @@ export function App() {
         snapshotToken={discussionMatch[2]}
       />
     );
+  } else if (seg[0] === "d" && seg[1]) {
+    // id 不是数字：原版仍命中 [id] 路由，只是拿不到可入队的 id → 未找到页（无按钮）
+    page = <DiscussionNotFound id={Number.NaN} />;
   } else if (seg[0] === "u" && seg[1] && /^\d+$/.test(seg[1])) {
     page = <UserPage key={seg[1]} id={Number(seg[1])} />;
+  } else if (seg[0] === "u" && seg[1]) {
+    page = <UserNotFound />;
   } else if (seg[0] === "recent") {
     page = <RecentPage />;
   } else if (seg[0] === "explore") {
     page = <ExplorePage />;
-  } else {
+  } else if (seg[0] === "a") {
+    // 文章：本项目不归档，等价原版 (article)/not-found.tsx
+    page = <ArticleNotFound />;
+  } else if (seg[0] === "p") {
+    // 云剪贴板：同上
+    page = <PasteNotFound />;
+  } else if (seg.length === 0) {
     // "/" 首页：社区精选信息流
     page = <HomePage />;
+  } else {
+    // 未定义路由：原版由 Next 内置 404 兜底
+    page = <DefaultNotFound />;
   }
 
   return (
