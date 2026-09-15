@@ -11,16 +11,15 @@ import type { Db } from "../db/client.js";
 import { schema } from "../db/client.js";
 import type { UserColor } from "../db/schema.js";
 import type { UserSummary } from "./types.js";
-import { deduplicate } from "./utils.js";
+import { chunkRows, deduplicate } from "./utils.js";
 
 type UserSnapshotRow = typeof schema.UserSnapshot.$inferSelect;
 
 async function saveUsers(db: Db, uids: number[]): Promise<void> {
   if (!uids.length) return;
-  await db
-    .insert(schema.User)
-    .values(uids.map((id) => ({ id })))
-    .onConflictDoNothing();
+  for (const chunk of chunkRows(uids.map((id) => ({ id })))) {
+    await db.insert(schema.User).values(chunk).onConflictDoNothing();
+  }
 }
 
 /** 用户快照的业务字段（不含 capturedAt/lastSeenAt/contentHash 类元数据）。 */
@@ -143,8 +142,8 @@ export async function saveUserSnapshots(
       );
   }
 
-  // 4) 变化的单次多行插入
-  if (toInsert.length) {
-    await db.insert(schema.UserSnapshot).values(toInsert).onConflictDoNothing();
+  // 4) 变化的按列数分批多行插入（UserSnapshot 13 列 → 每批最多 6 行）
+  for (const chunk of chunkRows(toInsert)) {
+    await db.insert(schema.UserSnapshot).values(chunk).onConflictDoNothing();
   }
 }

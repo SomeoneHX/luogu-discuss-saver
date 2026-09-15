@@ -13,6 +13,7 @@
 import { and, desc, eq, inArray, max, or } from "drizzle-orm";
 
 import type { Db } from "../db/client.js";
+import { chunkRows } from "./utils.js";
 import { schema } from "../db/client.js";
 
 export async function sha256Hex(input: string): Promise<string> {
@@ -203,7 +204,12 @@ export async function saveReplySnapshots(
 
   // 4) 新快照单次多行插入（同秒主键冲突兜底）
   if (toInsert.length) {
-    await db.insert(schema.ReplySnapshot).values(toInsert).onConflictDoNothing();
+    for (const chunk of chunkRows(toInsert)) {
+      await db
+        .insert(schema.ReplySnapshot)
+        .values(chunk)
+        .onConflictDoNothing();
+    }
   }
 
   return toInsert.length;

@@ -35,12 +35,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 单账号请求间隔闸门：最小间隔之上叠加 0~50% 随机抖动，
- *  避免呈现固定节律（洛谷自动风控会识别「高度一致的请求间隔」）。
+/** 抖动上限（毫秒）：实际间隔 = CRAWL_MIN_INTERVAL_MS + 随机 0~该值。 */
+const CRAWL_JITTER_MAX_MS = 10_000;
+
+/** 单账号请求间隔闸门：最小间隔（默认 6s）之上叠加 0~10s 随机抖动 →
+ *  实际间隔 6~16s，避免呈现固定节律（洛谷自动风控会识别「高度一致的请求间隔」）。
  *  注意：模块级状态不跨 isolate，个人站单 isolate 足够；
  *  若要严格全局限流可升级到 Durable Object。 */
 async function throttle(minIntervalMs: number): Promise<void> {
-  const interval = minIntervalMs + Math.floor(Math.random() * minIntervalMs * 0.5);
+  const interval = minIntervalMs + Math.floor(Math.random() * CRAWL_JITTER_MAX_MS);
   const wait = lastRequestAt + interval - Date.now();
   if (wait > 0) await sleep(wait);
   lastRequestAt = Date.now();

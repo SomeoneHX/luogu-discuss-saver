@@ -23,7 +23,9 @@ queue = "luogu-crawl"
 [[queues.consumers]]
 queue = "luogu-crawl"
 max_batch_size = 10
-max_batch_timeout = 30
+# 链条是串行的：批等待只会给每一页平白加上固定延迟（原来 30s），
+# 步骤间隔改由 consumer 侧的 0~10s 随机入队延迟控制。
+max_batch_timeout = 1
 max_retries = 5
 dead_letter_queue = "luogu-crawl-dlq"
 

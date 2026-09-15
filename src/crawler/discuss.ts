@@ -31,7 +31,7 @@ import {
   type ReplySummary,
 } from "./types.js";
 import { saveUserSnapshots } from "./user.js";
-import { deduplicate } from "./utils.js";
+import { chunkRows, deduplicate } from "./utils.js";
 
 export const REPLIES_PER_PAGE = 10;
 
@@ -107,17 +107,15 @@ async function saveReplyRows(
 
   // Reply 行字段不可变（postId/authorId/time 固定），冲突即跳过；
   // 单次多行插入替代逐条 upsert，省 D1 写行数与 subrequest。
-  await db
-    .insert(schema.Reply)
-    .values(
-      deduplicated.map(({ postId, reply }) => ({
-        id: reply.id,
-        postId,
-        authorId: reply.author.uid,
-        time: new Date(reply.time * 1000),
-      })),
-    )
-    .onConflictDoNothing();
+  const rows = deduplicated.map(({ postId, reply }) => ({
+    id: reply.id,
+    postId,
+    authorId: reply.author.uid,
+    time: new Date(reply.time * 1000),
+  }));
+  for (const chunk of chunkRows(rows)) {
+    await db.insert(schema.Reply).values(chunk).onConflictDoNothing();
+  }
 }
 
 // ------------------------------- fetchDiscuss ------------------------------

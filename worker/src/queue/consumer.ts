@@ -7,7 +7,8 @@ import { AccessError } from "../../../src/crawler/errors.js";
 import { enqueue, jobLabel, type Job } from "../../../src/queue/jobs.js";
 import type { WorkerEnv } from "../env.js";
 
-/** 回填（向前翻页）时的入队延迟，用于平滑请求速率。 */
+/** 回填（向前翻页）时的入队延迟，用于平滑请求速率。
+ *  请求间隔的随机化在取数层（http.ts 的 throttle）统一负责，这里保持固定小延迟。 */
 const BACKFILL_DELAY_SECONDS = 2;
 
 export async function processJob(env: WorkerEnv, job: Job): Promise<void> {
