@@ -7,6 +7,7 @@
 
 import { enqueue, type Job } from "../../src/queue/jobs.js";
 import type { WorkerEnv } from "./env.js";
+import { dispatchPendingMaintenance } from "./maintenance.js";
 import { handleQueue } from "./queue/consumer.js";
 
 /** 夜间（北京时间）时段：0~7 点不做自动发现，避免「昼夜不停」的机器画像。 */
@@ -24,6 +25,16 @@ function num(value: string | undefined, fallback: number): number {
  * 发现任务——真正访问洛谷的时刻是随机的，且大多数唤醒不产生任何洛谷请求。
  */
 async function handleScheduled(env: WorkerEnv, scheduledTime: number): Promise<void> {
+  // 运维任务与发现轮无关（不访问洛谷，只动自家数据），先投递
+  try {
+    const dispatched = await dispatchPendingMaintenance(env);
+    if (dispatched > 0) {
+      console.log(`[scheduled] maintenance queued: ${String(dispatched)}`);
+    }
+  } catch (error) {
+    console.error(`[scheduled] maintenance dispatch failed: ${String(error)}`);
+  }
+
   if (env.DISCOVERY_ENABLED !== "true") return;
 
   const beijingHour = new Date(scheduledTime + 8 * 3600_000).getUTCHours();

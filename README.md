@@ -170,6 +170,30 @@ npm run dev                   # 前端 Vite（5173，/api 代理到 8788）
 - **增量阈值**：`REPLY_DELTA_THRESHOLD`（默认 5），旧帖仅当未归档回复数超过该值才整体重抓；
 - **无自动发现**：本项目不做定时列表扫描，一切抓取均由用户按需触发。
 
+## 维护任务
+
+长期维护（判定 + 执行 + 结果记录）全部在 Worker 内完成，不依赖任何本地长驻脚本，
+也不暴露面向公网的运维端点。运维侧只写一条「触发信号」，其余交给 Worker：
+
+```sql
+-- 1) 写入触发信号（本地用 wrangler 执行一次 INSERT）
+insert into MaintenanceTask (op, status, requestedAt)
+values ('purge-orphan-posts', 'pending', strftime('%s','now'));
+
+-- 2) 查看执行结果（Worker 的小时级 cron 会取走 pending/超时 queued 的任务，
+--    投进队列串行执行，并把状态与统计回写同一行）
+select id, op, status, datetime(startedAt,'unixepoch'), datetime(finishedAt,'unixepoch'),
+       scanned, deletedPosts, deletedReplies, detail
+from MaintenanceTask order by id desc;
+```
+
+| op | 作用 |
+|---|---|
+| `purge-orphan-posts` | 删除「只有维度行、从未落过任何快照」的帖子及其回复行——这是写入被中断（配额耗尽、部署打断在途调用）留下的半截产物，帖子页会把它们当作未收录、列表页也无法展示。删除语句自带 `not exists` 守卫，且只处理静置超过 10 分钟的帖子，因此不会误删正在抓取的帖子。 |
+
+执行状态流转：`pending → queued → running → done | failed`。失败的记录会在 `detail` 里留下错误，
+把它改回 `pending` 即可重跑（操作幂等）。
+
 ## 数据模型
 
 从 [luogu-discussion-archive](https://github.com/piterator-org/luogu-discussion-archive) 剥离：只保留讨论帖  
