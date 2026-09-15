@@ -434,7 +434,11 @@ export function DiscussionPage({
               </div>
 
               <section className="space-y-6 text-base leading-relaxed text-muted-foreground sm:text-lg">
-                <Markdown>{snap?.content || "（无内容）"}</Markdown>
+                <Markdown
+                  originalUrl={`https://www.luogu.com.cn/discuss/${String(id)}`}
+                >
+                  {snap?.content || "（无内容）"}
+                </Markdown>
               </section>
             </section>
 

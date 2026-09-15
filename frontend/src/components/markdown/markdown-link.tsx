@@ -18,6 +18,7 @@ import { cn } from "../../lib/utils";
 import luoguSvg from "../../../vendor/luogu.svg";
 
 import { FeedCardTemplateContent } from "../feed/feed-card-template";
+import { ForumDisplayShort } from "../forum-display";
 import LinkWithOriginal from "./magic-link/link-with-original";
 import UserMagicLinkDirect from "./magic-link/user/direct";
 import UserMagicLinkWithOriginal from "./magic-link/user/with-original";
@@ -272,6 +273,17 @@ export default function MarkdownLink(props: MarkdownLinkProps) {
     // --- 讨论帖 ---
     if (entry?.type === "discuss") {
       const discussEntry = entry.data as DiscussEntry | null;
+      if (!discussEntry) {
+        return (
+          <Link href={`/d/${entry.id}`} className={className}>
+            <MessagesSquare
+              className="relative top-[0.03125em] me-0.5 -mt-[0.25em] inline-block size-[1em]"
+              aria-hidden="true"
+            />
+            {children ?? (linkLabel || `\u8ba8\u8bba\u2009${entry.id}`)}
+          </Link>
+        );
+      }
       if (discussEntry) {
         const display = isLinkTextUseful({
           href: trueUrl,
@@ -294,7 +306,9 @@ export default function MarkdownLink(props: MarkdownLinkProps) {
               <FeedCardTemplateContent
                 kind="discussion"
                 time={new Date(discussEntry.time * 1000)}
-                metaTags={[<span key="forum">{discussEntry.forum?.name ?? "未知板块"}</span>]}
+                metaTags={[
+                  <ForumDisplayShort forum={discussEntry.forum} key={discussEntry.forum?.slug ?? "forum"} />,
+                ]}
                 title={discussEntry.title}
                 metrics={[
                   {
