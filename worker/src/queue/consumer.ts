@@ -6,7 +6,6 @@ import { fetchDiscuss } from "../../../src/crawler/discuss.js";
 import { AccessError } from "../../../src/crawler/errors.js";
 import { enqueue, jobLabel, type Job } from "../../../src/queue/jobs.js";
 import { runDiscovery } from "../discovery.js";
-import { runMaintenance } from "../maintenance.js";
 import type { WorkerEnv } from "../env.js";
 
 /** 回填（向前翻页）时的入队延迟，用于平滑请求速率。
@@ -15,11 +14,6 @@ const BACKFILL_DELAY_SECONDS = 2;
 
 export async function processJob(env: WorkerEnv, job: Job): Promise<void> {
   switch (job.type) {
-    case "maintenance": {
-      const result = await runMaintenance(env, job.taskId, job.op);
-      console.log(`[maintenance] ${JSON.stringify(result)}`);
-      break;
-    }
     case "discover": {
       const result = await runDiscovery(env);
       console.log(`[discovery] ${JSON.stringify(result)}`);

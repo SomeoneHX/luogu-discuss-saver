@@ -10,24 +10,12 @@ import type { Env } from "../env.js";
 export type DiscussJob = { type: "discuss"; id: number; page?: number };
 /** 发现轮：拉取讨论列表，挑出落后/新增的帖子并入队抓取。 */
 export type DiscoverJob = { type: "discover" };
-/** 运维任务：长期维护的执行入口，判定与执行都在 Worker 内完成。 */
-export type MaintenanceOp = "purge-orphan-posts";
-export type MaintenanceJob = {
-  type: "maintenance";
-  taskId: number;
-  op: MaintenanceOp;
-};
-export type Job = DiscussJob | DiscoverJob | MaintenanceJob;
+export type Job = DiscussJob | DiscoverJob;
 
 export function jobLabel(job: Job): string {
-  switch (job.type) {
-    case "discover":
-      return "discover";
-    case "maintenance":
-      return `maintenance:${String(job.taskId)}:${job.op}`;
-    default:
-      return `discuss:${String(job.id)}:${String(job.page ?? 1)}`;
-  }
+  return job.type === "discover"
+    ? "discover"
+    : `discuss:${String(job.id)}:${String(job.page ?? 1)}`;
 }
 
 export interface EnqueueOptions {
