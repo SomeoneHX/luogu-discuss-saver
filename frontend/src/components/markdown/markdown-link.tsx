@@ -17,7 +17,7 @@ import { useMentionContext } from "../../lib/mention-context";
 import { cn } from "../../lib/utils";
 import luoguSvg from "../../../vendor/luogu.svg";
 
-import { FeedCardTemplateContent } from "../feed/feed-card-template";
+import { FeedCardTemplate } from "../feed/feed-card-template";
 import { ForumDisplayShort } from "../forum-display";
 import LinkWithOriginal from "./magic-link/link-with-original";
 import UserMagicLinkDirect from "./magic-link/user/direct";
@@ -303,7 +303,8 @@ export default function MarkdownLink(props: MarkdownLinkProps) {
             iconCorner={onlyImagesInChildren}
             original={display}
             preview={
-              <FeedCardTemplateContent
+              <FeedCardTemplate
+                headless
                 kind="discussion"
                 time={new Date(discussEntry.time * 1000)}
                 metaTags={[

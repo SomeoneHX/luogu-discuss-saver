@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Link } from "../../App";
 import type { AuthorInfo } from "../../lib/api";
 import { ABSOLUTE_DATE_FORMATTER, cn, formatRelativeTime } from "../../lib/utils";
 
@@ -8,7 +9,7 @@ import UserInlineLink from "../user-inline-link";
 
 /**
  * 移植自原版 apps/web/components/feed/feed-card-template.tsx。
- * 悬浮预览卡用 headless 模式（无外框、无链接），与 FeedCardTemplateContent 一致。
+ * headless 模式用于 Markdown 悬浮预览卡；非 headless 用于信息流大卡。
  */
 
 type FeedKind = "discussion" | "article" | "paste" | "judgement";
@@ -32,7 +33,12 @@ const TYPE_META: Record<FeedKind, { label: string; badgeClass: string }> = {
   },
 };
 
-export function FeedCardTemplateContent({
+export type FeedCardMetric = {
+  icon?: React.ComponentType<{ className?: string }>;
+  children: ReactNode;
+};
+
+export function FeedCardTemplate({
   kind,
   time,
   metaTags = [],
@@ -40,8 +46,12 @@ export function FeedCardTemplateContent({
   title,
   content,
   contentMaxLines,
+  tags,
   metrics,
   user,
+  href,
+  headless = false,
+  tabIndexOverride,
 }: {
   kind: FeedKind;
   time: Date;
@@ -50,14 +60,88 @@ export function FeedCardTemplateContent({
   title?: string | null;
   content?: ReactNode | null;
   contentMaxLines?: number;
-  metrics?: { icon?: React.ComponentType<{ className?: string }>; children: ReactNode }[] | null;
+  tags?: ReactNode[] | null;
+  metrics?: FeedCardMetric[] | null;
+  user?: AuthorInfo | null;
+  href?: string | null;
+  headless?: boolean;
+  tabIndexOverride?: number;
+}) {
+  return headless ? (
+    <FeedCardTemplateContent
+      kind={kind}
+      time={time}
+      metaTags={metaTags}
+      metaText={metaText}
+      title={title}
+      content={content}
+      contentMaxLines={contentMaxLines}
+      tags={tags}
+      metrics={metrics}
+      user={user}
+      preventInnerPointerEvents
+    />
+  ) : (
+    <article>
+      <div
+        className={cn(
+          "group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm transition duration-200 hover:shadow-lg",
+          href && "hover:-translate-y-1",
+        )}
+      >
+        {href ? (
+          <Link href={href} className="absolute inset-0 rounded-2xl" aria-label={title ?? undefined} />
+        ) : null}
+        <FeedCardTemplateContent
+          kind={kind}
+          time={time}
+          metaTags={metaTags}
+          metaText={metaText}
+          title={title}
+          content={content}
+          contentMaxLines={contentMaxLines}
+          tags={tags}
+          metrics={metrics}
+          user={user}
+          preventPointerEvents={Boolean(href)}
+          tabIndexOverride={tabIndexOverride}
+        />
+      </div>
+    </article>
+  );
+}
+
+export function FeedCardTemplateContent({
+  kind,
+  time,
+  metaTags = [],
+  metaText,
+  title,
+  content,
+  contentMaxLines,
+  tags,
+  metrics,
+  user,
+  preventPointerEvents = false,
+  preventInnerPointerEvents = false,
+  tabIndexOverride,
+}: {
+  kind: FeedKind;
+  time: Date;
+  metaTags?: ReactNode[] | null;
+  metaText?: string | null;
+  title?: string | null;
+  content?: ReactNode | null;
+  contentMaxLines?: number;
+  tags?: ReactNode[] | null;
+  metrics?: FeedCardMetric[] | null;
   user?: AuthorInfo | null;
   preventPointerEvents?: boolean;
   preventInnerPointerEvents?: boolean;
   tabIndexOverride?: number;
 }) {
   return (
-    <div className="z-1">
+    <div className={cn("z-1", preventPointerEvents && "pointer-events-none")}>
       <header className="flex items-center justify-between gap-3">
         <span className="inline-flex gap-1.5">
           <span
@@ -87,7 +171,7 @@ export function FeedCardTemplateContent({
         </h3>
         {metaText ? <span className="text-muted-foreground">{metaText}</span> : null}
         <div
-          className="fake-p my-2 text-base"
+          className="fake-p my-2 text-base wrap-anywhere"
           style={{
             overflow: "hidden",
             display: "-webkit-box",
@@ -99,6 +183,18 @@ export function FeedCardTemplateContent({
         >
           {content}
         </div>
+        {tags?.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {tags.map((tag, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center rounded-md bg-muted/70 px-2 py-0.5 text-xs text-muted-foreground"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {metrics?.length ? (
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
             {metrics.map((metric, index) => (
@@ -109,7 +205,12 @@ export function FeedCardTemplateContent({
       </div>
       <footer className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-muted-foreground">
         {user ? (
-          <UserInlineLink user={user} avatar link={false} />
+          <UserInlineLink
+            user={user}
+            avatar
+            {...(preventInnerPointerEvents ? { link: false } : {})}
+            {...(tabIndexOverride !== undefined ? { tabIndex: tabIndexOverride } : {})}
+          />
         ) : (
           <span className="text-foreground">匿名用户</span>
         )}

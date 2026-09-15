@@ -59,9 +59,9 @@ export function RecentPage() {
 
   return (
     <div className="flex flex-1 justify-center px-4 pt-8 pb-16 sm:px-6 lg:px-8">
-      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,8fr)_minmax(0,1.5fr)]">
-        <aside className="hidden lg:block" />
-        <main className="order-1 flex flex-col gap-8">
+      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,8fr)_minmax(0,1.75fr)] xl:grid-cols-[minmax(0,1.5fr)_minmax(0,8fr)_minmax(0,1.5fr)] 2xl:grid-cols-[minmax(0,3fr)_minmax(0,8fr)_minmax(0,3fr)]">
+        <aside className="hidden lg:flex lg:flex-col" />
+        <main className="order-1 flex flex-col gap-8 2xl:order-2">
           {error ? <p className="text-sm text-destructive">加载失败：{error}</p> : null}
           {!items && !error ? <SkeletonList /> : null}
           {items && items.length === 0 ? (
@@ -73,7 +73,7 @@ export function RecentPage() {
             ))}
           </div>
         </main>
-        <aside className="order-2 hidden lg:block" />
+        <aside className="order-2 lg:order-2 lg:block 2xl:order-3" />
       </div>
     </div>
   );
@@ -97,8 +97,9 @@ export function ExplorePage() {
 
   return (
     <div className="flex flex-1 justify-center px-4 pt-8 pb-16 sm:px-6 lg:px-8">
-      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,8fr)_minmax(0,3.5fr)]">
-        <main className="order-1 flex flex-col gap-8">
+      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,8fr)_minmax(0,3.5fr)] xl:grid-cols-[minmax(0,8fr)_minmax(0,3fr)] 2xl:grid-cols-[minmax(0,3fr)_minmax(0,8fr)_minmax(0,3fr)]">
+        <aside className="hidden 2xl:flex 2xl:flex-col" />
+        <main className="order-1 flex flex-col gap-8 2xl:order-2">
           {error ? <p className="text-sm text-destructive">加载失败：{error}</p> : null}
           {!items && !error ? <SkeletonList /> : null}
           {items && items.length === 0 ? (
@@ -110,7 +111,7 @@ export function ExplorePage() {
             ))}
           </div>
         </main>
-        <aside className="order-2 hidden lg:block">
+        <aside className="order-2 hidden lg:order-2 lg:block 2xl:order-3">
           <ActiveUsers users={users} />
         </aside>
       </div>

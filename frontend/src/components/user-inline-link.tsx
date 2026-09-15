@@ -22,6 +22,7 @@ export default function UserInlineLink({
   className,
   link = true,
   nameColorOverride,
+  tabIndex,
 }: {
   user: AuthorInfo | null;
   avatar?: boolean;
@@ -31,6 +32,8 @@ export default function UserInlineLink({
   link?: boolean;
   /** 覆盖名字颜色（原版用于 markdown 里的普通用户链接，固定 indigo） */
   nameColorOverride?: string;
+  /** 原版用于卡片内的 tabIndex 覆盖（整卡是一个链接时不希望内链进 tab 序） */
+  tabIndex?: number;
 }) {
   if (!user) {
     return <span className="text-foreground">匿名用户</span>;
@@ -91,6 +94,7 @@ export default function UserInlineLink({
     return (
       <Link
         href={`/u/${String(user.id)}`}
+        {...(tabIndex !== undefined ? { tabIndex } : {})}
         className={cn(
           "inline-flex items-center rounded-full transition-colors duration-200 hover:bg-primary/10",
           className,

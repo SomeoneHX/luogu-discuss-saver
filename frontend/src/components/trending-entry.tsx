@@ -1,6 +1,7 @@
 import { Link } from "../App";
 import { MessageCircle, MessageCircleDashed } from "lucide-react";
 import type { PostCard } from "../lib/api";
+import { renderMarkdownToPlainText } from "../lib/markdown-plain-text";
 import { formatAbsolute, formatRelativeTime } from "../lib/utils";
 import { ForumDisplay } from "./forum-display";
 import { MetaItem } from "./meta-item";
@@ -8,7 +9,8 @@ import UserInlineLink from "./user-inline-link";
 
 export default function TrendingEntryDiscussion({ post }: { post: PostCard }) {
   const rawContent = post.content?.trim() || "";
-  const plainContent = rawContent.length > 0 ? plainText(rawContent) : "";
+  const plainContent =
+    rawContent.length > 0 ? renderMarkdownToPlainText(rawContent) : "";
   return (
     <article>
       <div className="group relative flex flex-col rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg">
@@ -37,7 +39,7 @@ export default function TrendingEntryDiscussion({ post }: { post: PostCard }) {
           <div className="mt-4 space-y-3">
             <h3 className="text-lg leading-tight font-semibold text-foreground">{post.title}</h3>
             <div
-              className="fake-p my-2 text-base break-all"
+              className="fake-p my-2 text-base wrap-anywhere"
               style={{
                 overflow: "hidden",
                 display: "-webkit-box",
@@ -50,9 +52,7 @@ export default function TrendingEntryDiscussion({ post }: { post: PostCard }) {
             </div>
           </div>
           <footer className="mt-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-xs text-muted-foreground">
-            <span className="pointer-events-auto">
-              <UserInlineLink user={post.author} />
-            </span>
+            <UserInlineLink user={post.author} />
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <MetaItem compact icon={MessageCircle}>{`${String(post.replyCount)}\u2009评论`}</MetaItem>
               <MetaItem compact icon={MessageCircleDashed}>
@@ -64,14 +64,4 @@ export default function TrendingEntryDiscussion({ post }: { post: PostCard }) {
       </div>
     </article>
   );
-}
-
-function plainText(content: string): string {
-  return content
-    .replace(/```[\s\S]*?```/g, " [代码] ")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[#>*`~_[\]-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
