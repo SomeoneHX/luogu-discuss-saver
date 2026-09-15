@@ -37,6 +37,30 @@ export const USER_COLORS = [
 ] as const;
 export type UserColor = (typeof USER_COLORS)[number];
 
+// --------------------------- DiscoveryRun ---------------------------------
+/**
+ * 自动发现轮的运行记录（运维可观测性）。
+ * Worker 侧 `wrangler tail` 在部分网络环境不可用，把每轮结果落库后
+ * 可以直接用 D1 查询「自动抓取到底做了什么」。
+ */
+export const DiscoveryRun = sqliteTable(
+  "DiscoveryRun",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    ranAt: integer("ranAt", { mode: "timestamp" }).notNull(),
+    scanned: integer("scanned").notNull(),
+    topped: integer("topped").notNull(),
+    fresh: integer("fresh").notNull(),
+    belowDelta: integer("belowDelta").notNull(),
+    cooling: integer("cooling").notNull(),
+    enqueued: integer("enqueued").notNull(),
+    enqueuedIds: text("enqueuedIds").notNull(),
+    /** 每帖判定明细 JSON：[{id,topped,isNew,delta,action}]，便于事后回答「为什么没抓某帖」 */
+    detail: text("detail").notNull().default(""),
+  },
+  (t) => [index("DiscoveryRun_ranAt_idx").on(t.ranAt)],
+);
+
 // ------------------------------- User -------------------------------------
 
 export const User = sqliteTable("User", {
