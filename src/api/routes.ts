@@ -247,18 +247,16 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
     let queued = false;
     try {
       queued = await enqueue(c.env, job);
-    } catch {
-      // 队列配额耗尽 / 不可用 → 直接在 Function 内抓取（waitUntil 异步执行）
+    } catch (err) {
+      console.error(`[crawl] enqueue failed: ${String(err)}`);
     }
     if (!queued) {
-      // 队列配额耗尽 / 不可用 → 直接在 Function 内抓取（waitUntil 异步执行）
-      const { fetchDiscuss } = await import("../crawler/discuss.js");
-      c.executionCtx.waitUntil(
-        fetchDiscuss(c.env, job.id, job.page).catch((err: unknown) => {
-          console.error(`[crawl] direct crawl failed: ${String(err)}`);
-        }),
+      // 队列不可用（配额耗尽 / 未绑定）→ 明确失败，不降级为 Pages 内直连：
+      // 直连跑在边缘多 isolate 上会绕过全局节流、丢失回填链且无 DO 串行化。
+      return c.json(
+        { error: "抓取队列当前不可用，请稍后重试" },
+        503,
       );
-      return c.json({ queued: false, direct: true, id }, 202);
     }
     return c.json({ queued: true, id }, 202);
   });

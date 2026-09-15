@@ -40,14 +40,14 @@
 
 Pages Functions 支持 D1 绑定与 Queue **Producer**，但 **Queue 消费与 Durable Object 类必须由独立 Worker 承载**，因此抓取消费端放在无用户入口的后台 Worker，用户访问全部走 Pages。
 
-**入队兜底**：Queue 不可用（如配额耗尽）时，`/crawl` 端点降级为在 Function 内 `waitUntil` 直连抓取，保证手动触发始终可用。
+**队列不可用**：Queue 不可用（配额耗尽 / 未绑定）时，`/crawl` 端点直接返回 503，不做 Function 内直连降级——抓取必须经队列单 isolate 串行消费，才能保证全局请求节流与回填链完整。
 
 **快照写入的两条路径**（`src/crawler/discuss.ts` 自动选择）：
 
 - Worker（绑定 `POST_LOCKER`）→ DO 按 postId 严格串行，语义对齐上游的 `pg_advisory_xact_lock`；
 - Pages（未绑定 DO）→ contentHash 幂等去重兜底。
 
-**消息时效**：队列消息携带 `enqueuedAt`，消费时超过 600 秒的旧消息直接丢弃，避免堆积任务在恢复后集中重放。
+**任务幂等**：抓取任务按 `contentHash` 幂等，重复消费不会写入重复快照；队列消息不做时效丢弃，积压任务按序消费即可自然收敛。
 
 ## 关键取数结论
 
@@ -72,7 +72,7 @@ src/                      共用逻辑（Pages 与 Worker 都引用）
 │   ├── persist.ts        快照持久化（DO 与回退路径共用）
 │   └── user.ts / problem.ts / types.ts / errors.ts / utils.ts
 ├── durable/postLockerInterface.ts   DO 接口（实现见 worker/）
-├── queue/jobs.ts         Job 类型 + enqueue（含 enqueuedAt 时间戳）
+├── queue/jobs.ts         Job 类型 + enqueue
 └── query/                读路径（Drizzle 关系查询）
     ├── discussion.ts     帖子 / 回复 / 快照时间线
     ├── feed.ts           信息流打分 + 游标分页
@@ -88,7 +88,7 @@ worker/                   后台 Worker（Queue Consumer + DO）
 ├── wrangler.toml
 └── src/
     ├── index.ts          entry（queue consumer）
-    ├── queue/consumer.ts processJob（含过期消息丢弃）
+    ├── queue/consumer.ts processJob（链式回填调度）
     └── durable/postLocker.ts  PostLocker DO
 
 wrangler.toml             Pages 配置（pages_build_output_dir = "dist"）
@@ -108,7 +108,7 @@ wrangler.toml             Pages 配置（pages_build_output_dir = "dist"）
 | GET  | `/api/trending/recent`          | 最近归档（边缘缓存 60s）                            |
 | GET  | `/api/users/:id`                | 用户页聚合数据                                   |
 | GET  | `/api/users/:id/timeline`       | 用户时间线（游标分页）                               |
-| POST | `/api/discussions/:id/crawl`    | 触发抓取（入队，失败时降级直连；按帖冷却 `CRAWL_COOLDOWN_SECONDS`，默认 300s） |
+| POST | `/api/discussions/:id/crawl`    | 触发抓取（入队；按帖冷却 `CRAWL_COOLDOWN_SECONDS`，默认 300s；队列不可用返回 503） |
 | GET  | `/api/health/luogu`             | 取数通路 + cookie 健康检查                        |
 
 ## 部署
@@ -153,7 +153,7 @@ npm run dev                   # 前端 Vite（5173，/api 代理到 8788）
 
 ## 抓取流程
 
-1. 用户点「更新帖子」或访问未归档帖子 → `POST /api/discussions/:id/crawl` → 入队（失败降级为 Function 内直连抓取）；
+1. 用户点「更新帖子」或访问未归档帖子 → `POST /api/discussions/:id/crawl` → 入队（队列不可用时返回 503）；
 2. Queue Consumer 消费 `discuss` 任务 → `fetchDiscuss` 抓取该帖（首楼 + 回复，链式向前翻页补齐历史回复）；
 3. 快照经 `PostLocker` DO 按 postId 串行写入 D1，contentHash 幂等去重；
 4. 前端重新拉取详情与回复即可看到新快照。

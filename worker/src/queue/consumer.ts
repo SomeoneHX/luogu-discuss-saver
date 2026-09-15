@@ -4,17 +4,13 @@
 
 import { fetchDiscuss } from "../../../src/crawler/discuss.js";
 import { AccessError } from "../../../src/crawler/errors.js";
-import { JOB_STALE_SECONDS, enqueue, jobLabel, type Job } from "../../../src/queue/jobs.js";
+import { enqueue, jobLabel, type Job } from "../../../src/queue/jobs.js";
 import type { WorkerEnv } from "../env.js";
 
 /** 回填（向前翻页）时的入队延迟，用于平滑请求速率。 */
 const BACKFILL_DELAY_SECONDS = 2;
 
 export async function processJob(env: WorkerEnv, job: Job): Promise<void> {
-  // 过期消息（含无时间戳的旧格式消息）直接丢弃，不执行、不再入队。
-  if (!job.enqueuedAt || Date.now() / 1000 - job.enqueuedAt > JOB_STALE_SECONDS) {
-    return;
-  }
   switch (job.type) {
     case "discuss": {
       const id = job.id;

@@ -7,10 +7,7 @@
 
 import type { Env } from "../env.js";
 
-export type Job = { type: "discuss"; id: number; page?: number; enqueuedAt?: number };
-
-/** 消息超过该时长（秒）即视为过期，消费端直接丢弃。 */
-export const JOB_STALE_SECONDS = 600;
+export type Job = { type: "discuss"; id: number; page?: number };
 
 export function jobLabel(job: Job): string {
   return `discuss:${String(job.id)}:${String(job.page ?? 1)}`;
@@ -27,12 +24,9 @@ export async function enqueue(
   options: EnqueueOptions = {},
 ): Promise<boolean> {
   if (!env.CRAWL_QUEUE) return false;
-  await env.CRAWL_QUEUE.send(
-    { ...job, enqueuedAt: Math.floor(Date.now() / 1000) },
-    {
-      contentType: "json",
-      ...(options.delaySeconds ? { delaySeconds: options.delaySeconds } : {}),
-    },
-  );
+  await env.CRAWL_QUEUE.send(job, {
+    contentType: "json",
+    ...(options.delaySeconds ? { delaySeconds: options.delaySeconds } : {}),
+  });
   return true;
 }
