@@ -23,6 +23,10 @@ queue = "luogu-crawl"
 [[queues.consumers]]
 queue = "luogu-crawl"
 max_batch_size = 10
+# 串行消费：Queues 默认会按积压自动横向扩展并发调用，而取数层的 6~16s 节流是
+# 模块级（按 isolate 独立计时）——并发时对洛谷的实际请求密度会成倍上升。
+# 固定为 1 才能让「一个请求间隔」真正成为全局限速。
+max_concurrency = 1
 # 链条是串行的：批等待只会给每一页平白加上固定延迟（原来 30s），
 # 步骤间隔改由 consumer 侧的 0~10s 随机入队延迟控制。
 max_batch_timeout = 1
