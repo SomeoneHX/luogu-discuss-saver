@@ -22,7 +22,12 @@ queue = "luogu-crawl"
 
 [[queues.consumers]]
 queue = "luogu-crawl"
-max_batch_size = 10
+# 一次调用只领 1 条消息。CPU 上限是按「调用」算的，而批内多条消息的 CPU 会累加：
+# 2026-09-16 夜里队列积压 → 单次调用被塞进 3~6 条 → 累计 CPU 越过上限被运行时杀掉
+# （看板 Errors by invocation status = Exceeded CPU Time Limits，403 次；内存/异常均为 0），
+# 被杀的消息 5 次重试后进死信队列，而链条是「上一页成功才投下一页」→ 永久断链。
+# 每次只领 1 条可把单次调用的 CPU 压回「一页」的量级；并发本来就是 1，吞吐不受影响。
+max_batch_size = 1
 # 串行消费：Queues 默认会按积压自动横向扩展并发调用，而取数层的 6~16s 节流是
 # 模块级（按 isolate 独立计时）——并发时对洛谷的实际请求密度会成倍上升。
 # 固定为 1 才能让「一个请求间隔」真正成为全局限速。
@@ -59,8 +64,14 @@ DISCOVERY_PROBABILITY = "0.33"
 DISCOVERY_NIGHT_PROBABILITY = "0"
 # 发现任务入队时的随机延迟上限（秒）
 DISCOVERY_DELAY_MAX_SECONDS = "1800"
-# 读取的洛谷列表页数（每页约 25 条）
-DISCOVERY_LIST_PAGES = "2"
+# 定向抓取的版块（逗号分隔）。洛谷题目讨论只能发在具体题目下
+# （`?forum=problem` 的「题目总榜」只是聚合视图，不可单独发帖），而账号未提交过的
+# 题目其讨论区一律 403 —— 混合列表里这类帖子刷新最勤，会长期霸占单轮名额且注定失败，
+# 所以只扫可稳定获取的三个版块：学术版 / 站务版 / 工单反馈版。
+# 想恢复「抓混合列表」：把该值留空即可（含各题目讨论区）。
+DISCOVERY_FORUMS = "academics,siteaffairs,service"
+# 每个版块读取的列表页数（每页 30 条）
+DISCOVERY_LIST_PAGES = "1"
 # 单轮最多入队帖子数
 DISCOVERY_MAX_POSTS = "5"
 # 按帖冷却下限（秒）；实际冷却 = max(该值, 帖子页数 × DISCOVERY_SECONDS_PER_PAGE)

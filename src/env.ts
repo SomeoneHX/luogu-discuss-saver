@@ -32,7 +32,14 @@ export interface Env {
   DISCOVERY_NIGHT_PROBABILITY?: string;
   /** 发现轮随机延迟上限（秒），把执行时刻打散，默认 1800。 */
   DISCOVERY_DELAY_MAX_SECONDS?: string;
-  /** 发现轮读取列表页数，默认 2。 */
+  /**
+   * 发现轮定向抓取的版块 slug（逗号分隔），如 "academics,siteaffairs,service"。
+   * 留空/不设 = 抓混合列表（`/discuss` 不带 forum 参数，含各题目讨论区）。
+   * 题目讨论区只能发在具体题目下（题目总榜 `problem` 是聚合视图，不可单独发帖），
+   * 而账号未提交过的题目其讨论区一律 403，故默认只扫可稳定获取的版块。
+   */
+  DISCOVERY_FORUMS?: string;
+  /** 发现轮**每个版块**读取的列表页数（未设 DISCOVERY_FORUMS 时按整体页数算），默认 2。 */
   DISCOVERY_LIST_PAGES?: string;
   /** 单轮最多入队多少个帖子，默认 5。 */
   DISCOVERY_MAX_POSTS?: string;
