@@ -5,7 +5,7 @@
 #     「按需抓取 + 可选外部 scheduler 调用 /api/cron/crawl」。
 #   - 静态产物目录：dist（由 `npm run build` 生成的 Vite 产物）。
 #
-name = "luogu-discuss-saver"
+name = "lglg"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]

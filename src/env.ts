@@ -20,6 +20,12 @@ export interface Env {
   CRAWL_MIN_INTERVAL_MS?: string;
   /** 按帖冷却秒数：距上次快照确认不足该值时拒绝重复触发（0=关闭）。 */
   CRAWL_COOLDOWN_SECONDS?: string;
+  /**
+   * 运维触发令牌：`POST /api/discussions/:id/crawl?pages=N` 需要
+   * `Authorization: Bearer <该值>` 才放行。仅用于「从指定页开始补洞」这类人工干预；
+   * 未设置时该通道整体关闭（返回 503）。
+   */
+  CRAWL_TRIGGER_TOKEN?: string;
   /** 旧帖增量抓取阈值，默认 5。 */
   REPLY_DELTA_THRESHOLD?: string;
 

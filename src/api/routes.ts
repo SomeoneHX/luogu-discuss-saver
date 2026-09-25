@@ -292,6 +292,42 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id)) return c.json({ error: "invalid id" }, 400);
 
+    // --- 运维通道：?pages=N 或 ?pages=N,M,...（`page` 为同义别名）---
+    // 从**指定页开始**向下回填，用于给「尾部已归档、中间带洞」的大帖补洞：
+    // 直接从洞的上沿起步，省掉每次从尾部重穿十几页的 lead-in。
+    // 需要 `Authorization: Bearer $CRAWL_TRIGGER_TOKEN`；未配置令牌则该通道关闭。
+    // 冷却闸门在这条路径上不适用（频率由调用方与令牌把控），故先于冷却判定返回。
+    const pagesParam = c.req.query("pages") ?? c.req.query("page");
+    if (pagesParam !== undefined) {
+      const expected = c.env.CRAWL_TRIGGER_TOKEN;
+      if (!expected) return c.json({ error: "trigger disabled" }, 503);
+      if ((c.req.header("authorization") ?? "") !== `Bearer ${expected}`) {
+        return c.json({ error: "unauthorized" }, 401);
+      }
+      const pages = [
+        ...new Set(
+          pagesParam
+            .split(",")
+            .map((s) => Number(s.trim()))
+            .filter((n) => Number.isInteger(n) && n > 0),
+        ),
+      ];
+      if (!pages.length) return c.json({ error: "invalid page" }, 400);
+
+      try {
+        for (const page of pages) {
+          const ok = await enqueue(c.env, { type: "discuss", id, page });
+          if (!ok) {
+            return c.json({ error: "抓取队列当前不可用，请稍后重试" }, 503);
+          }
+        }
+      } catch (err) {
+        console.error(`[crawl] ops enqueue failed: ${String(err)}`);
+        return c.json({ error: "抓取队列当前不可用，请稍后重试" }, 503);
+      }
+      return c.json({ queued: pages.length, id, pages }, 202);
+    }
+
     // 按帖冷却：距最近一次快照确认不足 CRAWL_COOLDOWN_SECONDS 时拒绝，
     // 防止同一帖被反复触发整条回填链（消耗队列 ops 与 D1 写行数）。
     const cooldown = Number(c.env.CRAWL_COOLDOWN_SECONDS ?? "300");
@@ -315,16 +351,21 @@ export function registerApi(app: Hono<{ Bindings: Env }>): void {
 
     const job: Job = { type: "discuss", id };
     let queued = false;
+    // reason 只在失败时填充并随 503 返回：队列不可用是本项目最常见的线上故障，
+    // 而 Pages Functions 的 console 不会落盘，不回传原因就只能瞎猜（2026-09-19 踩过）。
+    let reason: string | undefined;
     try {
       queued = await enqueue(c.env, job);
+      if (!queued) reason = "binding CRAWL_QUEUE missing";
     } catch (err) {
-      console.error(`[crawl] enqueue failed: ${String(err)}`);
+      reason = String(err);
+      console.error(`[crawl] enqueue failed: ${reason}`);
     }
     if (!queued) {
-      // 队列不可用（配额耗尽 / 未绑定）→ 明确失败，不降级为 Pages 内直连：
+      // 队列不可用（配额耗尽 / 未绑定 / 生产者未注册）→ 明确失败，不降级为 Pages 内直连：
       // 直连跑在边缘多 isolate 上会绕过全局节流、丢失回填链且无 DO 串行化。
       return c.json(
-        { error: "抓取队列当前不可用，请稍后重试" },
+        { error: "抓取队列当前不可用，请稍后重试", reason },
         503,
       );
     }

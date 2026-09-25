@@ -29,8 +29,13 @@ export async function processJob(env: WorkerEnv, job: Job): Promise<void> {
         page,
       );
 
-      // 有最新回复但尚未归档 → 补抓最后一页
-      if (recentReply && !recentReplySnapshot) {
+      // 有最新回复但尚未归档 → 补抓最后一页。
+      // 必须排除「当前页就是最后一页」：当 recentReply 根本不在这条帖的回复列表里
+      // （被删除 / 被折叠 / 分页计数竞态）时它永远拿不到快照，每次都重投尾部页会让
+      // 这条链无限自我循环，并独占单消费者（max_concurrency = 1）的全部配额 ——
+      // 2026-09-19 实测：一条这样的死循环把约 333 次/小时的全部抓取量吃光，
+      // 队列被持续喂消息，其他帖子（含 3 个待补洞的大帖）完全轮不到。
+      if (recentReply && !recentReplySnapshot && page !== numPages) {
         await enqueue(env, { type: "discuss", id, page: numPages });
       }
 
